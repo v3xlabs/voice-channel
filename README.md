@@ -13,16 +13,19 @@ A fair, simple, and reliable voice, video, and screen sharing system built with 
 ## Technology Stack
 
 ### Backend
-- **Rust** with Axum web framework
+- **Rust** with Poem web framework
 - **PostgreSQL** database with SQLx
-- **OpenAPI** documentation with utoipa
+- **OpenAPI** documentation with poem_openapi
 - **WebRTC** for real-time communication
 
 ### Frontend
 - **React** with TypeScript
 - **Vite** for fast development and building
 - **Tailwind CSS** for styling
-- **React Router** for navigation
+- **TanStack Router** for file-based routing
+- **TanStack Query** for data fetching
+- **Radix UI** for accessible components
+- **openapi-typescript** for type-safe API client
 
 ## Quick Start
 
@@ -77,7 +80,7 @@ cd packages/web
 pnpm install
 
 # Start development server
-pnpm run dev
+pnpm dev
 ```
 
 ## Federation
@@ -97,16 +100,29 @@ When running the server, visit `/swagger-ui` to see the OpenAPI documentation fo
 
 ## Development
 
+The frontend uses OpenAPI types generated from the backend schema. When you run `pnpm dev`, it automatically:
+
+1. Generates TypeScript types from the backend OpenAPI schema
+2. Starts the Vite development server with hot reload
+3. Proxies API requests to the backend server
+
 ### Project Structure
 ```
 voice-channel/
 ├── packages/
 │   ├── server/          # Rust backend
 │   │   ├── src/
+│   │   │   ├── handlers/api.rs  # poem_openapi endpoints
+│   │   │   ├── models/          # Database models
+│   │   │   └── main.rs
 │   │   ├── migrations/
 │   │   └── Cargo.toml
 │   └── web/             # React frontend
 │       ├── src/
+│       │   ├── routes/          # TanStack Router file-based routes
+│       │   ├── types/api.ts     # Generated OpenAPI types
+│       │   ├── services/api.ts  # Type-safe API client
+│       │   └── pages/
 │       ├── public/
 │       └── package.json
 ├── docker-compose.yml

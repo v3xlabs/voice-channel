@@ -71,12 +71,16 @@ test-frontend:
 
 # Docker
 docker-up:
-	@echo "🐳 Starting with Docker Compose..."
-	@docker-compose up -d
+	@echo "🐳 Starting production with Docker Compose..."
+	@docker compose up -d
 
 docker-down:
 	@echo "🐳 Stopping Docker Compose..."
-	@docker-compose down
+	@docker compose down
+
+docker-dev:
+	@echo "🐳 Starting development dependencies..."
+	@cd packages/server && docker compose up -d
 
 # Cleanup
 clean:

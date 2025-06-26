@@ -52,21 +52,17 @@ pnpm run build
 
 cd ../..
 
-# Start PostgreSQL for development
-echo "🐘 Setting up PostgreSQL..."
-if docker ps | grep -q voice-channel-postgres; then
-    echo "📊 PostgreSQL is already running"
+# Start development dependencies
+echo "🐘 Setting up development dependencies..."
+cd packages/server
+if docker ps | grep -q voice-channel-dev-postgres; then
+    echo "📊 Development dependencies are already running"
 else
-    docker run -d --name voice-channel-postgres \
-        -e POSTGRES_DB=voice_channel \
-        -e POSTGRES_USER=postgres \
-        -e POSTGRES_PASSWORD=password \
-        -p 5432:5432 \
-        postgres:15
-    
-    echo "⏳ Waiting for PostgreSQL to be ready..."
+    docker compose up -d
+    echo "⏳ Waiting for dependencies to be ready..."
     sleep 10
 fi
+cd ../..
 
 # Run database migrations
 echo "🗃️  Running database migrations..."

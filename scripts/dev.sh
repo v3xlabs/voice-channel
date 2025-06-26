@@ -12,17 +12,14 @@ if ! docker info > /dev/null 2>&1; then
     exit 1
 fi
 
-# Start PostgreSQL if not running
-if ! docker ps | grep -q postgres; then
-    echo "🐘 Starting PostgreSQL..."
-    docker run -d --name voice-channel-postgres \
-        -e POSTGRES_DB=voice_channel \
-        -e POSTGRES_USER=postgres \
-        -e POSTGRES_PASSWORD=password \
-        -p 5432:5432 \
-        postgres:15
+# Start development dependencies if not running
+if ! docker ps | grep -q voice-channel-dev-postgres; then
+    echo "🐘 Starting development dependencies..."
+    cd packages/server
+    docker compose up -d
+    cd ../..
     
-    echo "⏳ Waiting for PostgreSQL to be ready..."
+    echo "⏳ Waiting for dependencies to be ready..."
     sleep 5
 fi
 

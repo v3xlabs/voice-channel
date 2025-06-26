@@ -1,7 +1,6 @@
-use poem_openapi::{payload::Json, OpenApi, ApiResponse};
+use poem_openapi::{payload::Json, OpenApi, param::Path};
 use uuid::Uuid;
 
-use crate::error::AppError;
 use crate::models::webrtc::*;
 use crate::models::participant::*;
 use crate::{MediasoupService, ParticipantService};
@@ -21,24 +20,19 @@ impl WebRtcApi {
             participant_service,
         }
     }
-}
 
-#[derive(ApiResponse)]
-enum WebRtcResponse<T: poem_openapi::types::ToJSON + poem_openapi::types::Type + Send> {
-    #[oai(status = 200)]
-    Ok(Json<T>),
-    #[oai(status = 500)]
-    InternalServerError,
-}
-
-#[derive(ApiResponse)]
-enum JoinResponse {
-    #[oai(status = 200)]
-    Ok(Json<ParticipantJoinResponse>),
-    #[oai(status = 400)]
-    BadRequest,
-    #[oai(status = 500)]
-    InternalServerError,
+    // Helper method to create a new participant
+    fn create_participant(&self, channel_id: Uuid, user_id: String, display_name: String) -> Participant {
+        let participant = Participant::new(
+            channel_id,
+            user_id,
+            Uuid::new_v4().to_string(), // peer_id
+            display_name,
+        );
+        
+        self.participant_service.add_participant(channel_id, participant.clone());
+        participant
+    }
 }
 
 #[OpenApi]
@@ -47,150 +41,147 @@ impl WebRtcApi {
     #[oai(path = "/api/channels/:id/join", method = "post")]
     async fn join_channel(
         &self,
-        id: poem::web::Path<Uuid>,
+        id: Path<Uuid>,
         request: Json<ParticipantJoinRequest>,
-    ) -> Result<JoinResponse, AppError> {
-        let channel_id = id.0;
+    ) -> poem_openapi::payload::Json<ParticipantJoinResponse> {
+        let channel_id = *id;
         
         // Ensure room exists
-        let _room = self.mediasoup_service.get_or_create_room(channel_id).await
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        self.mediasoup_service.get_or_create_room(channel_id).await
+            .expect("Failed to create mediasoup room");
 
-        // Join participant
-        let participant = self.participant_service.join_channel(
+        // Create and add participant
+        let participant = self.create_participant(
             channel_id,
             request.user_id.clone(),
             request.display_name.clone(),
-        ).await
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        );
 
         let response = ParticipantJoinResponse {
-            participant_id: participant.id,
+            participant_id: participant.id.to_string(),
             user_id: participant.user_id,
             display_name: participant.display_name,
-            audio_enabled: participant.audio_enabled,
-            video_enabled: participant.video_enabled,
+            audio_enabled: participant.is_audio_enabled,
+            video_enabled: participant.is_video_enabled,
         };
 
-        Ok(JoinResponse::Ok(Json(response)))
+        poem_openapi::payload::Json(response)
     }
 
     /// Leave a voice channel
     #[oai(path = "/api/channels/:id/leave", method = "post")]
     async fn leave_channel(
         &self,
-        id: poem::web::Path<Uuid>,
+        id: Path<Uuid>,
         request: Json<ParticipantLeaveRequest>,
-    ) -> Result<WebRtcResponse<ParticipantLeaveResponse>, AppError> {
-        let channel_id = id.0;
+    ) -> poem_openapi::payload::Json<ParticipantLeaveResponse> {
+        let channel_id = *id;
         
-        self.participant_service.leave_channel(channel_id, &request.participant_id).await
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        // Parse participant_id as UUID
+        if let Ok(participant_id) = uuid::Uuid::parse_str(&request.participant_id) {
+            self.participant_service.remove_participant(channel_id, participant_id);
+        }
 
         let response = ParticipantLeaveResponse {
             success: true,
         };
 
-        Ok(WebRtcResponse::Ok(Json(response)))
+        poem_openapi::payload::Json(response)
     }
 
     /// Get router RTP capabilities for a channel
     #[oai(path = "/api/channels/:id/rtp-capabilities", method = "get")]
     async fn get_router_rtp_capabilities(
         &self,
-        id: poem::web::Path<Uuid>,
-    ) -> Result<WebRtcResponse<RtpCapabilities>, AppError> {
-        let channel_id = id.0;
+        id: Path<Uuid>,
+    ) -> poem_openapi::payload::Json<RtpCapabilities> {
+        let channel_id = *id;
         
         // Ensure room exists
-        let _room = self.mediasoup_service.get_or_create_room(channel_id).await
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        self.mediasoup_service.get_or_create_room(channel_id).await
+            .expect("Failed to create mediasoup room");
 
         let capabilities = self.mediasoup_service.get_router_rtp_capabilities(channel_id)
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+            .expect("Failed to get RTP capabilities");
 
-        Ok(WebRtcResponse::Ok(Json(capabilities)))
+        poem_openapi::payload::Json(capabilities)
     }
 
     /// Create WebRTC transport for a channel
     #[oai(path = "/api/channels/:id/transports", method = "post")]
     async fn create_transport(
         &self,
-        id: poem::web::Path<Uuid>,
+        id: Path<Uuid>,
         request: Json<CreateTransportRequest>,
-    ) -> Result<WebRtcResponse<TransportInfo>, AppError> {
-        let channel_id = id.0;
+    ) -> poem_openapi::payload::Json<TransportInfo> {
+        let channel_id = *id;
 
         let transport_info = self.mediasoup_service.create_webrtc_transport(
             channel_id,
             request.producing,
             request.consuming,
-        ).await
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        ).await.expect("Failed to create WebRTC transport");
 
-        Ok(WebRtcResponse::Ok(Json(transport_info)))
+        poem_openapi::payload::Json(transport_info)
     }
 
     /// Connect a WebRTC transport
     #[oai(path = "/api/transports/:id/connect", method = "post")]
     async fn connect_transport(
         &self,
-        id: poem::web::Path<String>,
+        id: Path<String>,
         request: Json<ConnectTransportRequest>,
-    ) -> Result<WebRtcResponse<ConnectTransportResponse>, AppError> {
-        let transport_id = &id.0;
+    ) -> poem_openapi::payload::Json<ConnectTransportResponse> {
+        let transport_id = id.as_str();
 
         self.mediasoup_service.connect_transport(
             transport_id,
             &request.dtls_parameters,
-        ).await
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        ).await.expect("Failed to connect transport");
 
         let response = ConnectTransportResponse {
             success: true,
         };
 
-        Ok(WebRtcResponse::Ok(Json(response)))
+        poem_openapi::payload::Json(response)
     }
 
     /// Start producing media on a transport
     #[oai(path = "/api/transports/:id/produce", method = "post")]
     async fn produce(
         &self,
-        id: poem::web::Path<String>,
+        id: Path<String>,
         request: Json<ProduceRequest>,
-    ) -> Result<WebRtcResponse<ProduceResponse>, AppError> {
-        let transport_id = &id.0;
+    ) -> poem_openapi::payload::Json<ProduceResponse> {
+        let transport_id = id.as_str();
 
         let producer_id = self.mediasoup_service.produce(
             transport_id,
             &request.kind,
             request.rtp_parameters.clone(),
-        ).await
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        ).await.expect("Failed to create producer");
 
         let response = ProduceResponse {
             producer_id,
         };
 
-        Ok(WebRtcResponse::Ok(Json(response)))
+        poem_openapi::payload::Json(response)
     }
 
     /// Start consuming media from a producer
     #[oai(path = "/api/transports/:id/consume", method = "post")]
     async fn consume(
         &self,
-        id: poem::web::Path<String>,
+        id: Path<String>,
         request: Json<ConsumeRequest>,
-    ) -> Result<WebRtcResponse<ConsumeResponse>, AppError> {
-        let transport_id = &id.0;
+    ) -> poem_openapi::payload::Json<ConsumeResponse> {
+        let transport_id = id.as_str();
 
         let (consumer_id, kind, rtp_parameters) = self.mediasoup_service.consume(
             transport_id,
             &request.producer_id,
             &request.rtp_capabilities,
-        ).await
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
+        ).await.expect("Failed to create consumer");
 
         let response = ConsumeResponse {
             consumer_id,
@@ -199,39 +190,44 @@ impl WebRtcApi {
             rtp_parameters,
         };
 
-        Ok(WebRtcResponse::Ok(Json(response)))
+        poem_openapi::payload::Json(response)
     }
 
-    /// Update participant state
-    #[oai(path = "/api/participants/:id", method = "put")]
+    /// Update participant media state
+    #[oai(path = "/api/participants/:id", method = "patch")]
     async fn update_participant(
         &self,
-        id: poem::web::Path<String>,
+        id: Path<String>,
         request: Json<ParticipantUpdateRequest>,
-    ) -> Result<WebRtcResponse<ParticipantUpdateResponse>, AppError> {
-        let participant_id = &id.0;
+    ) -> poem_openapi::payload::Json<ParticipantUpdateResponse> {
+        // Parse participant_id as UUID
+        if let Ok(participant_id) = uuid::Uuid::parse_str(id.as_str()) {
+            // We need to find which channel this participant is in
+            // For now, we'll iterate through all channels to find the participant
+            for channel_entry in self.participant_service.participants.iter() {
+                let channel_id = *channel_entry.key();
+                if let Some(participant) = self.participant_service.update_participant_media_state(
+                    channel_id,
+                    participant_id,
+                    request.audio_enabled,
+                    request.video_enabled,
+                ) {
+                    let response = ParticipantUpdateResponse {
+                        participant_id: participant.id.to_string(),
+                        audio_enabled: participant.is_audio_enabled,
+                        video_enabled: participant.is_video_enabled,
+                    };
+                    return poem_openapi::payload::Json(response);
+                }
+            }
+        }
 
-        let participant = self.participant_service.update_participant(
-            participant_id,
-            request.audio_enabled,
-            request.video_enabled,
-        ).await
-            .map_err(|e| AppError::InternalServerError(e.to_string()))?;
-
+        // Default response if participant not found
         let response = ParticipantUpdateResponse {
-            participant_id: participant.id,
-            audio_enabled: participant.audio_enabled,
-            video_enabled: participant.video_enabled,
+            participant_id: id.to_string(),
+            audio_enabled: false,
+            video_enabled: false,
         };
-
-        Ok(WebRtcResponse::Ok(Json(response)))
+        poem_openapi::payload::Json(response)
     }
-}
-
-use poem_openapi::Tags;
-
-#[derive(Tags)]
-enum ApiTags {
-    /// WebRTC and media routing endpoints
-    WebRTC,
 } 

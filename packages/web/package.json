@@ -19,7 +19,7 @@
     "@radix-ui/react-dialog": "^1.0.5",
     "@radix-ui/react-label": "^2.1.7",
     "lucide-react": "^0.294.0",
-    "openapi-fetch": "^0.12.0",
+    "openapi-hooks": "^0.2.0",
     "mediasoup-client": "^3.7.4"
   },
   "devDependencies": {

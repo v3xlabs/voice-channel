@@ -56,7 +56,7 @@ build-backend:
 
 build-frontend:
 	@echo "⚛️  Building React frontend..."
-	@cd packages/web && npm run build
+	@cd packages/web && pnpm run build
 
 # Testing
 test: test-backend test-frontend
@@ -67,7 +67,7 @@ test-backend:
 
 test-frontend:
 	@echo "⚛️  Testing React frontend..."
-	@cd packages/web && npm test
+	@cd packages/web && pnpm test
 
 # Docker
 docker-up:

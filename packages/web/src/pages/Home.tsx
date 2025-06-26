@@ -1,43 +1,40 @@
-import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { useState } from 'react'
+import { Link } from '@tanstack/react-router'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Users, Clock } from 'lucide-react'
-import { channelApi, Channel } from '../services/api'
+import { channelApi, type Channel, type CreateChannelRequest } from '../services/api'
 
 export const Home: React.FC = () => {
-  const [channels, setChannels] = useState<Channel[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+  const queryClient = useQueryClient()
   const [showCreateForm, setShowCreateForm] = useState(false)
-  const [newChannel, setNewChannel] = useState({
+  const [newChannel, setNewChannel] = useState<CreateChannelRequest>({
     name: '',
     description: '',
     max_participants: 50
   })
 
-  useEffect(() => {
-    loadChannels()
-  }, [])
+  // Fetch channels using TanStack Query
+  const { data: channels = [], isLoading } = useQuery({
+    queryKey: ['channels'],
+    queryFn: () => channelApi.list(),
+  })
 
-  const loadChannels = async () => {
-    try {
-      const channelList = await channelApi.list()
-      setChannels(channelList)
-    } catch (error) {
-      console.error('Failed to load channels:', error)
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleCreateChannel = async (e: React.FormEvent) => {
-    e.preventDefault()
-    try {
-      await channelApi.create(newChannel)
+  // Create channel mutation
+  const createChannelMutation = useMutation({
+    mutationFn: (request: CreateChannelRequest) => channelApi.create(request),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['channels'] })
       setNewChannel({ name: '', description: '', max_participants: 50 })
       setShowCreateForm(false)
-      loadChannels()
-    } catch (error) {
+    },
+    onError: (error) => {
       console.error('Failed to create channel:', error)
-    }
+    },
+  })
+
+  const handleCreateChannel = (e: React.FormEvent) => {
+    e.preventDefault()
+    createChannelMutation.mutate(newChannel)
   }
 
   const formatDate = (dateString: string) => {

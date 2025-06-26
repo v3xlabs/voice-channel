@@ -74,10 +74,10 @@ cargo run
 cd packages/web
 
 # Install dependencies
-npm install
+pnpm install
 
 # Start development server
-npm run dev
+pnpm run dev
 ```
 
 ## Federation

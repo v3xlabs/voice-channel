@@ -16,28 +16,7 @@ mod models;
 
 use config::Config;
 use database::Database;
-use error::AppError;
-
-#[derive(OpenApi)]
-#[openapi(
-    paths(
-        handlers::health::health_check,
-        handlers::channels::list_channels,
-        handlers::channels::create_channel,
-    ),
-    components(
-        schemas(
-            models::channel::Channel,
-            models::channel::CreateChannelRequest,
-            handlers::health::HealthResponse,
-        )
-    ),
-    tags(
-        (name = "health", description = "Health check endpoints"),
-        (name = "channels", description = "Voice channel management"),
-    )
-)]
-struct ApiDoc;
+use handlers::api::Api;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -63,23 +42,25 @@ async fn main() -> Result<()> {
     // Create shared application state
     let state = Arc::new(AppState { db, config });
 
-    // Build router
-    let app = create_router(state);
+    // Create API service
+    let api_service = OpenApiService::new(Api { state }, "Voice Channel API", "1.0")
+        .server("http://localhost:3001/api");
+    
+    // Build the app with OpenAPI docs
+    let ui = api_service.swagger_ui();
+    let spec = api_service.spec_endpoint();
+    
+    let app = Route::new()
+        .nest("/api", api_service)
+        .nest("/swagger-ui", ui)
+        .nest("/api-docs", spec)
+        .with(Cors::new());
 
     // Start server
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3001").await?;
     info!("Server running on http://0.0.0.0:3001");
-    axum::serve(listener, app).await?;
+    Server::new(TcpListener::bind("0.0.0.0:3001"))
+        .run(app)
+        .await?;
 
     Ok(())
-}
-
-fn create_router(state: Arc<AppState>) -> Router {
-    Router::new()
-        .route("/api/health", get(handlers::health::health_check))
-        .route("/api/channels", get(handlers::channels::list_channels))
-        .route("/api/channels", post(handlers::channels::create_channel))
-        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
-        .layer(CorsLayer::permissive())
-        .with_state(state)
 } 

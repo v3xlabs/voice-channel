@@ -1,12 +1,12 @@
 use chrono::{DateTime, Utc};
+use poem_openapi::Object;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
-use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{database::Database, error::AppError};
 
-#[derive(Debug, Clone, Serialize, Deserialize, FromRow, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow, Object)]
 pub struct Channel {
     pub id: Uuid,
     pub name: String,
@@ -18,7 +18,7 @@ pub struct Channel {
     pub updated_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Deserialize, ToSchema)]
+#[derive(Debug, Deserialize, Object)]
 pub struct CreateChannelRequest {
     pub name: String,
     pub description: Option<String>,

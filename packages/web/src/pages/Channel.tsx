@@ -1,9 +1,9 @@
-import { useParams } from 'react-router-dom'
+import { useParams } from '@tanstack/react-router'
 import { useState, useEffect } from 'react'
 import { Mic, MicOff, Video, VideoOff, Phone, PhoneOff, Settings, Users } from 'lucide-react'
 
 export const Channel: React.FC = () => {
-  const { channelName, instanceFqdn } = useParams()
+  const { channelName, instanceFqdn } = useParams({ strict: false })
   const [isConnected, setIsConnected] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
   const [isVideoOn, setIsVideoOn] = useState(false)

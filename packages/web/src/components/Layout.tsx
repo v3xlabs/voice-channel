@@ -1,6 +1,6 @@
 import { ReactNode } from 'react'
-import { Link } from 'react-router-dom'
-import { Mic, MicOff, Video, VideoOff, Phone } from 'lucide-react'
+import { Link } from '@tanstack/react-router'
+import { Mic } from 'lucide-react'
 
 interface LayoutProps {
   children: ReactNode

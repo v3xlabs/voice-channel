@@ -4,7 +4,8 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently \"pnpm dev:openapi\" \"vite\"",
+    "dev:openapi": "openapi-typescript http://localhost:3001/api-docs/openapi.json -o src/types/api.ts --watch",
     "build": "tsc && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
@@ -12,9 +13,14 @@
   "dependencies": {
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.20.1",
-    "axios": "^1.6.2",
-    "lucide-react": "^0.294.0"
+    "@tanstack/react-router": "^1.58.3",
+    "@tanstack/react-query": "^5.56.2",
+    "@radix-ui/react-slot": "^1.1.0",
+    "@radix-ui/react-dialog": "^1.1.1",
+    "@radix-ui/react-button": "^1.1.0",
+    "@radix-ui/react-label": "^1.1.0",
+    "lucide-react": "^0.294.0",
+    "openapi-fetch": "^0.12.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.37",
@@ -29,6 +35,10 @@
     "postcss": "^8.4.31",
     "tailwindcss": "^3.3.5",
     "typescript": "^5.2.2",
-    "vite": "^4.5.0"
+    "vite": "^4.5.0",
+    "openapi-typescript": "^7.4.0",
+    "concurrently": "^8.2.2",
+    "@tanstack/router-devtools": "^1.58.3",
+    "@tanstack/router-cli": "^1.58.3"
   }
-} 
+}

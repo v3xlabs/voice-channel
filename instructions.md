@@ -15,6 +15,7 @@ This project will most likely be running in a kubernetes cluster, and will requi
   - sqlx
   - docker compose for dev environment
 - web
+  - pnpm
   - react
   - typescript
   - tailwind

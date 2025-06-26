@@ -20,7 +20,7 @@ echo "🔍 Checking required tools..."
 check_tool "docker"
 check_tool "cargo"
 check_tool "node"
-check_tool "npm"
+check_tool "pnpm"
 
 # Setup backend
 echo "🦀 Setting up Rust backend..."
@@ -44,11 +44,11 @@ cd packages/web
 
 # Install dependencies
 echo "📦 Installing Node.js dependencies..."
-npm install
+pnpm install
 
 # Check if we can build
 echo "🔨 Checking TypeScript compilation..."
-npm run build
+pnpm run build
 
 cd ../..
 

@@ -6,13 +6,13 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
-RUN npm ci
+RUN pnpm ci
 
 # Copy source code
 COPY . .
 
 # Build the app
-RUN npm run build
+RUN pnpm run build
 
 # Runtime stage
 FROM nginx:alpine
@@ -20,8 +20,7 @@ FROM nginx:alpine
 # Copy built assets
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Copy nginx configuration
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Use default nginx configuration
 
 EXPOSE 3000
 

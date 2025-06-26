@@ -55,10 +55,19 @@ impl Api {
         poem_openapi::payload::Json(channel)
     }
 
-    /// Get a specific channel
-    #[oai(path = "/channels/:id", method = "get", tag = "ApiTags::Channels")]
-    async fn get_channel(&self, id: Path<Uuid>) -> poem_openapi::payload::Json<Option<Channel>> {
+    /// Get a specific channel by ID
+    #[oai(path = "/channels/id/:id", method = "get", tag = "ApiTags::Channels")]
+    async fn get_channel_by_id(&self, id: Path<Uuid>) -> poem_openapi::payload::Json<Option<Channel>> {
         match Channel::find_by_id(&self.state.db, *id).await {
+            Ok(channel) => poem_openapi::payload::Json(channel),
+            Err(_) => poem_openapi::payload::Json(None),
+        }
+    }
+
+    /// Get a specific channel by name
+    #[oai(path = "/channels/name/:name", method = "get", tag = "ApiTags::Channels")]
+    async fn get_channel_by_name(&self, name: Path<String>) -> poem_openapi::payload::Json<Option<Channel>> {
+        match Channel::find_by_name(&self.state.db, &name).await {
             Ok(channel) => poem_openapi::payload::Json(channel),
             Err(_) => poem_openapi::payload::Json(None),
         }
@@ -67,60 +76,71 @@ impl Api {
     // WebRTC Endpoints
 
     /// Join a voice channel
-    #[oai(path = "/channels/:channel_id/join", method = "post", tag = "ApiTags::WebRTC")]
+    #[oai(path = "/channels/:channel_name/join", method = "post", tag = "ApiTags::WebRTC")]
     async fn join_channel(
         &self, 
-        channel_id: Path<Uuid>,
+        channel_name: Path<String>,
         request: Json<JoinChannelRequest>
     ) -> poem_openapi::payload::Json<Participant> {
-        // Verify channel exists
-        let _channel = Channel::find_by_id(&self.state.db, *channel_id).await
-            .expect("Failed to query channel");
+        // Find channel by name
+        let channel = Channel::find_by_name(&self.state.db, &channel_name).await
+            .expect("Failed to query channel")
+            .expect("Channel not found");
 
         // Ensure mediasoup room exists
-        self.state.mediasoup.get_or_create_room(*channel_id).await
+        self.state.mediasoup.get_or_create_room(channel.id).await
             .expect("Failed to create mediasoup room");
 
         // Create participant
         let peer_id = Uuid::new_v4().to_string();
         let participant = Participant::new(
-            *channel_id,
+            channel.id,
             request.user_id.clone(),
             peer_id,
             request.display_name.clone(),
         );
 
         // Add participant to service
-        self.state.participants.add_participant(*channel_id, participant.clone());
+        self.state.participants.add_participant(channel.id, participant.clone());
 
         poem_openapi::payload::Json(participant)
     }
 
     /// Get router RTP capabilities
-    #[oai(path = "/channels/:channel_id/rtp-capabilities", method = "get", tag = "ApiTags::WebRTC")]
+    #[oai(path = "/channels/:channel_name/rtp-capabilities", method = "get", tag = "ApiTags::WebRTC")]
     async fn get_rtp_capabilities(
         &self,
-        channel_id: Path<Uuid>,
+        channel_name: Path<String>,
     ) -> poem_openapi::payload::Json<RtpCapabilities> {
+        // Find channel by name
+        let channel = Channel::find_by_name(&self.state.db, &channel_name).await
+            .expect("Failed to query channel")
+            .expect("Channel not found");
+
         // Ensure room exists
-        self.state.mediasoup.get_or_create_room(*channel_id).await
+        self.state.mediasoup.get_or_create_room(channel.id).await
             .expect("Failed to get or create room");
 
-        let capabilities = self.state.mediasoup.get_router_rtp_capabilities(*channel_id)
+        let capabilities = self.state.mediasoup.get_router_rtp_capabilities(channel.id)
             .expect("Failed to get RTP capabilities");
         
         poem_openapi::payload::Json(capabilities)
     }
 
     /// Create WebRTC transport
-    #[oai(path = "/channels/:channel_id/transports", method = "post", tag = "ApiTags::WebRTC")]
+    #[oai(path = "/channels/:channel_name/transports", method = "post", tag = "ApiTags::WebRTC")]
     async fn create_transport(
         &self,
-        channel_id: Path<Uuid>,
+        channel_name: Path<String>,
         request: Json<CreateTransportRequest>,
     ) -> poem_openapi::payload::Json<TransportInfo> {
+        // Find channel by name
+        let channel = Channel::find_by_name(&self.state.db, &channel_name).await
+            .expect("Failed to query channel")
+            .expect("Channel not found");
+
         let transport_info = self.state.mediasoup.create_webrtc_transport(
-            *channel_id,
+            channel.id,
             request.producing,
             request.consuming,
         ).await.expect("Failed to create WebRTC transport");
@@ -179,12 +199,17 @@ impl Api {
     }
 
     /// Get channel participants
-    #[oai(path = "/channels/:channel_id/participants", method = "get", tag = "ApiTags::WebRTC")]
+    #[oai(path = "/channels/:channel_name/participants", method = "get", tag = "ApiTags::WebRTC")]
     async fn get_participants(
         &self,
-        channel_id: Path<Uuid>,
+        channel_name: Path<String>,
     ) -> poem_openapi::payload::Json<Vec<Participant>> {
-        let participants = self.state.participants.get_channel_participants(*channel_id);
+        // Find channel by name
+        let channel = Channel::find_by_name(&self.state.db, &channel_name).await
+            .expect("Failed to query channel")
+            .expect("Channel not found");
+
+        let participants = self.state.participants.get_channel_participants(channel.id);
         poem_openapi::payload::Json(participants)
     }
 

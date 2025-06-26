@@ -105,7 +105,7 @@ export class WebRTCService {
     }
   }
 
-  async enableVideo(): Promise<void> {
+  async enableVideo(): Promise<MediaStream> {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true });
       const videoTrack = stream.getVideoTracks()[0];
@@ -115,6 +115,8 @@ export class WebRTCService {
       if (this.localParticipant) {
         this.localParticipant.isVideoEnabled = true;
       }
+      
+      return stream;
     } catch (error) {
       console.error('Failed to enable video:', error);
       throw error;

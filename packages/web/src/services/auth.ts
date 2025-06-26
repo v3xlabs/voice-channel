@@ -7,6 +7,8 @@ export type CreateUserRequest = components['schemas']['CreateUserRequest'];
 export type UpdateUserRequest = components['schemas']['UpdateUserRequest'];
 export type UserAuthResponse = components['schemas']['UserAuthResponse'];
 export type ChannelWithMembership = components['schemas']['ChannelWithMembership'];
+export type ChannelMembership = components['schemas']['ChannelMembership'];
+export type JoinChannelMembershipRequest = components['schemas']['JoinChannelMembershipRequest'];
 
 const STORAGE_KEY = 'voice-channel-user';
 const INSTANCE_FQDN = 'localhost:3001'; // TODO: Get from environment
@@ -65,7 +67,7 @@ export class AuthService {
       data: request,
     });
 
-    const authResponse = response.data;
+    const authResponse = response.data as UserAuthResponse;
     this.saveToStorage(authResponse.user);
     
     return authResponse;
@@ -83,7 +85,7 @@ export class AuthService {
       data: updates,
     });
 
-    const updatedUser = response.data;
+    const updatedUser = response.data as User;
     this.saveToStorage(updatedUser);
     
     return updatedUser;
@@ -99,27 +101,31 @@ export class AuthService {
       path: { user_id: this.currentUser.id },
     });
 
-    return response.data;
+    return response.data as ChannelWithMembership[];
   }
 
   // Join a channel (become a member)
-  async joinChannel(instanceFqdn: string, channelName: string): Promise<void> {
+  async joinChannel(instanceFqdn: string, channelName: string): Promise<ChannelMembership> {
     if (!this.currentUser) {
       throw new Error('No user logged in');
     }
 
-    await apiFetch('/channels/{channel_instance_fqdn}/{channel_name}/members', 'post', {
+    const request: JoinChannelMembershipRequest = {
+      user_id: this.currentUser.id,
+      channel_instance_fqdn: instanceFqdn,
+      channel_name: channelName,
+    };
+
+    const response = await apiFetch('/channels/{channel_instance_fqdn}/{channel_name}/members', 'post', {
       path: { 
         channel_instance_fqdn: instanceFqdn,
         channel_name: channelName,
       },
       contentType: 'application/json; charset=utf-8',
-      data: {
-        user_id: this.currentUser.id,
-        channel_instance_fqdn: instanceFqdn,
-        channel_name: channelName,
-      },
+      data: request,
     });
+
+    return response.data as ChannelMembership;
   }
 
   // Leave a channel (remove membership)

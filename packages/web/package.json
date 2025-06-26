@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"pnpm dev:openapi\" \"vite\"",
+    "dev": "vite",
     "dev:openapi": "openapi-typescript http://localhost:3001/openapi.json -o src/types/api.ts --watch",
     "build": "tsc && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",

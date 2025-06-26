@@ -1,10 +1,10 @@
 use chrono::{DateTime, Utc};
 use poem_openapi::Object;
 use serde::{Deserialize, Serialize};
-use sqlx::FromRow;
+use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
 
-use crate::{database::Database, error::AppError};
+use crate::error::AppError;
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, Object)]
 pub struct Channel {
@@ -27,7 +27,7 @@ pub struct CreateChannelRequest {
 
 impl Channel {
     pub async fn create(
-        db: &Database,
+        pool: &PgPool,
         request: CreateChannelRequest,
         instance_fqdn: String,
     ) -> Result<Self, AppError> {
@@ -44,31 +44,31 @@ impl Channel {
             instance_fqdn,
             request.max_participants.unwrap_or(50)
         )
-        .fetch_one(&db.pool)
+        .fetch_one(pool)
         .await?;
 
         Ok(channel)
     }
 
-    pub async fn list_all(db: &Database) -> Result<Vec<Self>, AppError> {
+    pub async fn list_all(pool: &PgPool) -> Result<Vec<Self>, AppError> {
         let channels = sqlx::query_as!(Channel, "SELECT * FROM channels ORDER BY created_at DESC")
-            .fetch_all(&db.pool)
+            .fetch_all(pool)
             .await?;
 
         Ok(channels)
     }
 
-    pub async fn find_by_name(db: &Database, name: &str) -> Result<Option<Self>, AppError> {
+    pub async fn find_by_name(pool: &PgPool, name: &str) -> Result<Option<Self>, AppError> {
         let channel = sqlx::query_as!(Channel, "SELECT * FROM channels WHERE name = $1", name)
-            .fetch_optional(&db.pool)
+            .fetch_optional(pool)
             .await?;
 
         Ok(channel)
     }
 
-    pub async fn find_by_id(db: &Database, id: Uuid) -> Result<Option<Self>, AppError> {
+    pub async fn find_by_id(pool: &PgPool, id: Uuid) -> Result<Option<Self>, AppError> {
         let channel = sqlx::query_as!(Channel, "SELECT * FROM channels WHERE id = $1", id)
-            .fetch_optional(&db.pool)
+            .fetch_optional(pool)
             .await?;
 
         Ok(channel)

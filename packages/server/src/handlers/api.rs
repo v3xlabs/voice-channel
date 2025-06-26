@@ -10,6 +10,8 @@ use crate::{
             ProduceRequest, ProduceResponse, ConsumeRequest, ConsumeResponse,
         },
         participant::{JoinChannelRequest, Participant, ParticipantUpdate},
+        user::{User, CreateUserRequest, UpdateUserRequest, UserAuthResponse},
+        membership::{ChannelMembership, ChannelWithMembership, JoinChannelMembershipRequest},
     },
     AppState,
 };
@@ -24,6 +26,8 @@ enum ApiTags {
     Channels,
     /// WebRTC and media routing endpoints
     WebRTC,
+    /// User authentication and management
+    Auth,
 }
 
 #[OpenApi]
@@ -37,7 +41,7 @@ impl Api {
     /// List all channels
     #[oai(path = "/channels", method = "get", tag = "ApiTags::Channels")]
     async fn list_channels(&self) -> poem_openapi::payload::Json<Vec<Channel>> {
-        match Channel::list_all(&self.state.db).await {
+        match Channel::list_all(&self.state.db.pool).await {
             Ok(channels) => poem_openapi::payload::Json(channels),
             Err(_) => poem_openapi::payload::Json(vec![]),
         }
@@ -49,7 +53,7 @@ impl Api {
         &self,
         request: Json<CreateChannelRequest>,
     ) -> poem_openapi::payload::Json<Channel> {
-        let channel = Channel::create(&self.state.db, request.0, self.state.config.instance_fqdn.clone())
+        let channel = Channel::create(&self.state.db.pool, request.0, self.state.config.instance_fqdn.clone())
             .await
             .expect("Failed to create channel");
         poem_openapi::payload::Json(channel)
@@ -58,7 +62,7 @@ impl Api {
     /// Get a specific channel by ID
     #[oai(path = "/channels/id/:id", method = "get", tag = "ApiTags::Channels")]
     async fn get_channel_by_id(&self, id: Path<Uuid>) -> poem_openapi::payload::Json<Option<Channel>> {
-        match Channel::find_by_id(&self.state.db, *id).await {
+        match Channel::find_by_id(&self.state.db.pool, *id).await {
             Ok(channel) => poem_openapi::payload::Json(channel),
             Err(_) => poem_openapi::payload::Json(None),
         }
@@ -67,7 +71,7 @@ impl Api {
     /// Get a specific channel by name
     #[oai(path = "/channels/name/:name", method = "get", tag = "ApiTags::Channels")]
     async fn get_channel_by_name(&self, name: Path<String>) -> poem_openapi::payload::Json<Option<Channel>> {
-        match Channel::find_by_name(&self.state.db, &name).await {
+        match Channel::find_by_name(&self.state.db.pool, &name).await {
             Ok(channel) => poem_openapi::payload::Json(channel),
             Err(_) => poem_openapi::payload::Json(None),
         }
@@ -83,7 +87,7 @@ impl Api {
         request: Json<JoinChannelRequest>
     ) -> poem_openapi::payload::Json<Participant> {
         // Find channel by name
-        let channel = Channel::find_by_name(&self.state.db, &channel_name).await
+        let channel = Channel::find_by_name(&self.state.db.pool, &channel_name).await
             .expect("Failed to query channel")
             .expect("Channel not found");
 
@@ -113,7 +117,7 @@ impl Api {
         channel_name: Path<String>,
     ) -> poem_openapi::payload::Json<RtpCapabilities> {
         // Find channel by name
-        let channel = Channel::find_by_name(&self.state.db, &channel_name).await
+        let channel = Channel::find_by_name(&self.state.db.pool, &channel_name).await
             .expect("Failed to query channel")
             .expect("Channel not found");
 
@@ -135,7 +139,7 @@ impl Api {
         request: Json<CreateTransportRequest>,
     ) -> poem_openapi::payload::Json<TransportInfo> {
         // Find channel by name
-        let channel = Channel::find_by_name(&self.state.db, &channel_name).await
+        let channel = Channel::find_by_name(&self.state.db.pool, &channel_name).await
             .expect("Failed to query channel")
             .expect("Channel not found");
 
@@ -205,7 +209,7 @@ impl Api {
         channel_name: Path<String>,
     ) -> poem_openapi::payload::Json<Vec<Participant>> {
         // Find channel by name
-        let channel = Channel::find_by_name(&self.state.db, &channel_name).await
+        let channel = Channel::find_by_name(&self.state.db.pool, &channel_name).await
             .expect("Failed to query channel")
             .expect("Channel not found");
 
@@ -242,5 +246,111 @@ impl Api {
         } else {
             poem_openapi::payload::Json(serde_json::json!({"error": "Participant not found"}))
         }
+    }
+
+    // Authentication Endpoints
+
+    /// User login/registration
+    #[oai(path = "/auth/login", method = "post", tag = "ApiTags::Auth")]
+    async fn login(
+        &self,
+        request: Json<CreateUserRequest>,
+    ) -> poem_openapi::payload::Json<UserAuthResponse> {
+        let result = User::create_or_get(&self.state.db.pool, request.0).await
+            .expect("Failed to create or get user");
+
+        poem_openapi::payload::Json(result)
+    }
+
+    /// Update user profile
+    #[oai(path = "/users/:user_id", method = "patch", tag = "ApiTags::Auth")]
+    async fn update_user(
+        &self,
+        user_id: Path<Uuid>,
+        request: Json<UpdateUserRequest>,
+    ) -> poem_openapi::payload::Json<User> {
+        let user = User::update(&self.state.db.pool, *user_id, request.0).await
+            .expect("Failed to update user");
+
+        poem_openapi::payload::Json(user)
+    }
+
+    /// Get user profile
+    #[oai(path = "/users/:user_id", method = "get", tag = "ApiTags::Auth")]
+    async fn get_user(
+        &self,
+        user_id: Path<Uuid>,
+    ) -> poem_openapi::payload::Json<Option<User>> {
+        let user = User::find_by_id(&self.state.db.pool, *user_id).await
+            .expect("Failed to get user");
+
+        poem_openapi::payload::Json(user)
+    }
+
+    /// Get user's joined channels
+    #[oai(path = "/users/:user_id/channels", method = "get", tag = "ApiTags::Auth")]
+    async fn get_user_channels(
+        &self,
+        user_id: Path<Uuid>,
+    ) -> poem_openapi::payload::Json<Vec<ChannelWithMembership>> {
+        let channels = ChannelMembership::get_user_channels(
+            &self.state.db.pool, 
+            *user_id, 
+            &self.state.config.instance_fqdn
+        ).await.expect("Failed to get user channels");
+
+        poem_openapi::payload::Json(channels)
+    }
+
+    /// Join a channel (become a member)
+    #[oai(path = "/channels/:channel_instance_fqdn/:channel_name/members", method = "post", tag = "ApiTags::Channels")]
+    async fn join_channel_membership(
+        &self,
+        channel_instance_fqdn: Path<String>,
+        channel_name: Path<String>,
+        request: Json<JoinChannelMembershipRequest>,
+    ) -> poem_openapi::payload::Json<ChannelMembership> {
+        let membership = ChannelMembership::join_channel(
+            &self.state.db.pool,
+            request.user_id,
+            channel_instance_fqdn.to_string(),
+            channel_name.to_string(),
+        ).await.expect("Failed to join channel");
+
+        poem_openapi::payload::Json(membership)
+    }
+
+    /// Leave a channel (remove membership)
+    #[oai(path = "/channels/:channel_instance_fqdn/:channel_name/members/:user_id", method = "delete", tag = "ApiTags::Channels")]
+    async fn leave_channel_membership(
+        &self,
+        channel_instance_fqdn: Path<String>,
+        channel_name: Path<String>,
+        user_id: Path<Uuid>,
+    ) -> poem_openapi::payload::Json<serde_json::Value> {
+        let success = ChannelMembership::leave_channel(
+            &self.state.db.pool, 
+            *user_id, 
+            channel_instance_fqdn.to_string(),
+            channel_name.to_string()
+        ).await.expect("Failed to leave channel");
+
+        poem_openapi::payload::Json(serde_json::json!({ "success": success }))
+    }
+
+    /// Get channel members
+    #[oai(path = "/channels/:channel_instance_fqdn/:channel_name/members", method = "get", tag = "ApiTags::Channels")]
+    async fn get_channel_members(
+        &self,
+        channel_instance_fqdn: Path<String>,
+        channel_name: Path<String>,
+    ) -> poem_openapi::payload::Json<Vec<User>> {
+        let members = ChannelMembership::get_channel_members(
+            &self.state.db.pool, 
+            channel_instance_fqdn.to_string(),
+            channel_name.to_string()
+        ).await.expect("Failed to get channel members");
+
+        poem_openapi::payload::Json(members)
     }
 } 

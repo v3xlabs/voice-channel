@@ -491,6 +491,247 @@ export interface paths {
         };
         trace?: never;
     };
+    "/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** User login/registration */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json; charset=utf-8": components["schemas"]["CreateUserRequest"];
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["UserAuthResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get user profile */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    user_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["User"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update user profile */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    user_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json; charset=utf-8": components["schemas"]["UpdateUserRequest"];
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["User"];
+                    };
+                };
+            };
+        };
+        trace?: never;
+    };
+    "/users/{user_id}/channels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get user's joined channels */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    user_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ChannelWithMembership"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/channels/{channel_instance_fqdn}/{channel_name}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get channel members */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    channel_instance_fqdn: string;
+                    channel_name: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["User"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** Join a channel (become a member) */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    channel_instance_fqdn: string;
+                    channel_name: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json; charset=utf-8": components["schemas"]["JoinChannelMembershipRequest"];
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ChannelMembership"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/channels/{channel_instance_fqdn}/{channel_name}/members/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Leave a channel (remove membership) */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    channel_instance_fqdn: string;
+                    channel_name: string;
+                    user_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": unknown;
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -510,6 +751,25 @@ export interface components {
             created_at: string;
             /** Format: date-time */
             updated_at: string;
+        };
+        /** ChannelMembership */
+        ChannelMembership: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            user_id: string;
+            channel_instance_fqdn: string;
+            channel_name: string;
+            /** Format: date-time */
+            joined_at: string;
+            /** Format: date-time */
+            last_active: string;
+        };
+        /** ChannelWithMembership */
+        ChannelWithMembership: {
+            channel?: components["schemas"]["Channel"];
+            membership: components["schemas"]["ChannelMembership"];
+            is_local: boolean;
         };
         /** ConnectTransportRequest */
         ConnectTransportRequest: {
@@ -541,6 +801,12 @@ export interface components {
             producing: boolean;
             consuming: boolean;
         };
+        /** CreateUserRequest */
+        CreateUserRequest: {
+            username?: string;
+            display_name?: string;
+            instance_fqdn: string;
+        };
         /** DtlsFingerprint */
         DtlsFingerprint: {
             algorithm: string;
@@ -566,6 +832,13 @@ export interface components {
         IceParameters: {
             username_fragment: string;
             password: string;
+        };
+        /** JoinChannelMembershipRequest */
+        JoinChannelMembershipRequest: {
+            /** Format: uuid */
+            user_id: string;
+            channel_instance_fqdn: string;
+            channel_name: string;
         };
         /** JoinChannelRequest */
         JoinChannelRequest: {
@@ -628,6 +901,29 @@ export interface components {
             ice_parameters: components["schemas"]["IceParameters"];
             ice_candidates: components["schemas"]["IceCandidate"][];
             dtls_parameters: components["schemas"]["DtlsParameters"];
+        };
+        /** UpdateUserRequest */
+        UpdateUserRequest: {
+            username?: string;
+            display_name?: string;
+        };
+        /** User */
+        User: {
+            /** Format: uuid */
+            id: string;
+            username: string;
+            display_name: string;
+            instance_fqdn: string;
+            is_temporary: boolean;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        /** UserAuthResponse */
+        UserAuthResponse: {
+            user: components["schemas"]["User"];
+            is_new: boolean;
         };
     };
     responses: never;

@@ -9,6 +9,27 @@ Users can join a channel and talk, turn on their webcam, share their screen, and
 Use free and open source software.
 This project will most likely be running in a kubernetes cluster, and will require some form of between instance communication. Such that if we scale up the number of instances the users can still communicate with each other.
 
+- server
+  - poem
+  - poem_openapi
+  - sqlx
+  - docker compose for dev environment
+- web
+  - react
+  - typescript
+  - tailwind
+  - vite
+  - radix-ui
+  - tanstack query
+  - tanstack router
+  - openapi-typescript (to generate types from schema)
+  - openapi-hooks (package that lets you wrap openapi schema)
+
+### Web
+
+The web app is a react app that uses the openapi schema generated when the `pnpm dev` command is run.
+It then uses `openapi-hooks` to wrap the openapi schema and turn it into a usable fetch-like function that can be used within tanstack query hooks.
+
 ### Mediasoup
 
 https://mediasoup.org/documentation/overview/

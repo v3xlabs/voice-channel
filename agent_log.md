@@ -1,5 +1,7 @@
 # Agent Log for Voice Channel Project
 
+adjust this file as you see fit.
+
 ## Format for Log Entries
 
 Each log entry should include:

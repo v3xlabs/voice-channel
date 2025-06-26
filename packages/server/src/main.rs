@@ -14,15 +14,20 @@ mod database;
 mod error;
 mod handlers;
 mod models;
+mod services;
 
 use config::Config;
 use database::Database;
 use handlers::api::Api;
+use services::mediasoup_service::MediasoupService;
+use services::participant_service::ParticipantService;
 
 #[derive(Clone)]
 pub struct AppState {
     pub db: Database,
     pub config: Config,
+    pub mediasoup: Arc<MediasoupService>,
+    pub participants: Arc<ParticipantService>,
 }
 
 #[tokio::main]
@@ -40,20 +45,32 @@ async fn main() -> Result<()> {
     let db = Database::new(&config.database_url).await?;
     db.run_migrations().await?;
 
-    // Create shared application state
-    let state = Arc::new(AppState { db, config });
+    // Initialize Mediasoup service
+    info!("Initializing Mediasoup service...");
+    let mediasoup = Arc::new(MediasoupService::new().await?);
+    info!("Mediasoup service initialized successfully");
 
-    // Create API service
+    // Initialize participant service
+    let participants = Arc::new(ParticipantService::new());
+
+    // Create shared application state
+    let state = Arc::new(AppState { 
+        db, 
+        config,
+        mediasoup,
+        participants,
+    });
+
+    // Create unified API service that includes both channel and WebRTC endpoints
     let api_service = OpenApiService::new(Api { state }, "Voice Channel API", "1.0")
         .server("http://localhost:3001/api");
     
-    // Get OpenAPI spec
-    let spec = api_service.spec();
+    let spec_endpoint = api_service.spec_endpoint();
     
     // Configure CORS
     let cors = Cors::new()
         .allow_origin("http://localhost:3000")
-        .allow_methods(vec!["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+        .allow_methods(vec!["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"])
         .allow_headers(vec!["content-type", "authorization"]);
     
     // Scalar documentation HTML
@@ -61,11 +78,7 @@ async fn main() -> Result<()> {
     
     let app = Route::new()
         .nest("/api", api_service)
-        .at("/openapi.json", poem::endpoint::make_sync(move |_| {
-            poem::Response::builder()
-                .header("content-type", "application/json")
-                .body(spec.clone())
-        }))
+        .at("/openapi.json", spec_endpoint)
         .at("/docs", poem::endpoint::make_sync(move |_| {
             Html(docs_html)
         }))

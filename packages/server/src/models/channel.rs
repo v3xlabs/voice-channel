@@ -65,4 +65,12 @@ impl Channel {
 
         Ok(channel)
     }
+
+    pub async fn find_by_id(db: &Database, id: Uuid) -> Result<Option<Self>, AppError> {
+        let channel = sqlx::query_as!(Channel, "SELECT * FROM channels WHERE id = $1", id)
+            .fetch_optional(&db.pool)
+            .await?;
+
+        Ok(channel)
+    }
 } 

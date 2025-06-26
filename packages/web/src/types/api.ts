@@ -26,7 +26,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json; charset=utf-8": components["schemas"]["HealthResponse"];
+                        "text/plain; charset=utf-8": string;
                     };
                 };
             };
@@ -64,12 +64,6 @@ export interface paths {
                         "application/json; charset=utf-8": components["schemas"]["Channel"][];
                     };
                 };
-                500: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
-                };
             };
         };
         put?: never;
@@ -87,7 +81,7 @@ export interface paths {
                 };
             };
             responses: {
-                201: {
+                200: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -95,17 +89,83 @@ export interface paths {
                         "application/json; charset=utf-8": components["schemas"]["Channel"];
                     };
                 };
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content?: never;
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/channels/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a specific channel */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
                 };
-                500: {
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["Channel"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/channels/{channel_id}/join": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Join a voice channel */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    channel_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json; charset=utf-8": components["schemas"]["JoinChannelRequest"];
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["Participant"];
+                    };
                 };
             };
         };
@@ -113,6 +173,285 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/channels/{channel_id}/rtp-capabilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get router RTP capabilities */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    channel_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["RtpCapabilities"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/channels/{channel_id}/transports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create WebRTC transport */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    channel_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json; charset=utf-8": components["schemas"]["CreateTransportRequest"];
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["TransportInfo"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/transports/{transport_id}/connect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Connect WebRTC transport */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    transport_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json; charset=utf-8": components["schemas"]["ConnectTransportRequest"];
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": unknown;
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/transports/{transport_id}/produce": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start producing media */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    transport_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json; charset=utf-8": components["schemas"]["ProduceRequest"];
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ProduceResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/transports/{transport_id}/consume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start consuming media */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    transport_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json; charset=utf-8": components["schemas"]["ConsumeRequest"];
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["ConsumeResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/channels/{channel_id}/participants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get channel participants */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    channel_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["Participant"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/participants/{participant_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update participant media state */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    participant_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json; charset=utf-8": components["schemas"]["ParticipantUpdate"];
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": unknown;
+                    };
+                };
+            };
+        };
         trace?: never;
     };
 }
@@ -135,6 +474,24 @@ export interface components {
             /** Format: date-time */
             updated_at: string;
         };
+        /** ConnectTransportRequest */
+        ConnectTransportRequest: {
+            transport_id: string;
+            dtls_parameters: components["schemas"]["DtlsParameters"];
+        };
+        /** ConsumeRequest */
+        ConsumeRequest: {
+            transport_id: string;
+            producer_id: string;
+            rtp_capabilities: components["schemas"]["RtpCapabilities"];
+        };
+        /** ConsumeResponse */
+        ConsumeResponse: {
+            consumer_id: string;
+            producer_id: string;
+            kind: string;
+            rtp_parameters: unknown;
+        };
         /** CreateChannelRequest */
         CreateChannelRequest: {
             name: string;
@@ -142,11 +499,98 @@ export interface components {
             /** Format: int32 */
             max_participants?: number;
         };
-        /** HealthResponse */
-        HealthResponse: {
-            status: string;
-            version: string;
-            instance_fqdn: string;
+        /** CreateTransportRequest */
+        CreateTransportRequest: {
+            producing: boolean;
+            consuming: boolean;
+        };
+        /** DtlsFingerprint */
+        DtlsFingerprint: {
+            algorithm: string;
+            value: string;
+        };
+        /** DtlsParameters */
+        DtlsParameters: {
+            role: string;
+            fingerprints: components["schemas"]["DtlsFingerprint"][];
+        };
+        /** IceCandidate */
+        IceCandidate: {
+            foundation: string;
+            /** Format: uint32 */
+            priority: number;
+            ip: string;
+            /** Format: uint16 */
+            port: number;
+            type: string;
+            protocol: string;
+        };
+        /** IceParameters */
+        IceParameters: {
+            username_fragment: string;
+            password: string;
+        };
+        /** JoinChannelRequest */
+        JoinChannelRequest: {
+            user_id: string;
+            display_name: string;
+        };
+        /** Participant */
+        Participant: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            channel_id: string;
+            user_id: string;
+            peer_id: string;
+            display_name: string;
+            is_audio_enabled: boolean;
+            is_video_enabled: boolean;
+            /** Format: date-time */
+            joined_at: string;
+        };
+        /** ParticipantUpdate */
+        ParticipantUpdate: {
+            is_audio_enabled?: boolean;
+            is_video_enabled?: boolean;
+        };
+        /** ProduceRequest */
+        ProduceRequest: {
+            transport_id: string;
+            kind: string;
+            rtp_parameters: unknown;
+        };
+        /** ProduceResponse */
+        ProduceResponse: {
+            producer_id: string;
+        };
+        /** RtpCapabilities */
+        RtpCapabilities: {
+            codecs: components["schemas"]["RtpCodecCapability"][];
+            header_extensions: components["schemas"]["RtpHeaderExtension"][];
+        };
+        /** RtpCodecCapability */
+        RtpCodecCapability: {
+            kind: string;
+            mime_type: string;
+            /** Format: uint32 */
+            clock_rate: number;
+            /** Format: uint32 */
+            channels?: number;
+            parameters: unknown;
+        };
+        /** RtpHeaderExtension */
+        RtpHeaderExtension: {
+            uri: string;
+            /** Format: uint32 */
+            id: number;
+        };
+        /** TransportInfo */
+        TransportInfo: {
+            id: string;
+            ice_parameters: components["schemas"]["IceParameters"];
+            ice_candidates: components["schemas"]["IceCandidate"][];
+            dtls_parameters: components["schemas"]["DtlsParameters"];
         };
     };
     responses: never;

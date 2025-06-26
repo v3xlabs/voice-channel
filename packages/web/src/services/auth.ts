@@ -11,6 +11,7 @@ export type ChannelMembership = components['schemas']['ChannelMembership'];
 export type JoinChannelMembershipRequest = components['schemas']['JoinChannelMembershipRequest'];
 
 const STORAGE_KEY = 'voice-channel-user';
+const PASSKEY_KEY = 'voice-channel-passkey';
 const INSTANCE_FQDN = 'localhost:3001'; // TODO: Get from environment
 
 export class AuthService {
@@ -54,12 +55,19 @@ export class AuthService {
     return this.currentUser !== null;
   }
 
-  // Create or login user
-  async login(username?: string, displayName?: string): Promise<UserAuthResponse> {
+  // Generate a simple passkey (for demo - in production use WebAuthn)
+  private generatePasskey(): string {
+    return 'pk_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+  }
+
+  // Create new account with passkey
+  async createAccount(displayName: string): Promise<UserAuthResponse> {
+    const passkey = this.generatePasskey();
+    
     const request: CreateUserRequest = {
-      username,
       display_name: displayName,
       instance_fqdn: INSTANCE_FQDN,
+      passkey_credential: passkey,
     };
 
     const response = await apiFetch('/auth/login', 'post', {
@@ -70,7 +78,22 @@ export class AuthService {
     const authResponse = response.data as UserAuthResponse;
     this.saveToStorage(authResponse.user);
     
+    // Store passkey for future logins
+    localStorage.setItem(PASSKEY_KEY, passkey);
+    
     return authResponse;
+  }
+
+  // Login with stored passkey (future: implement WebAuthn)
+  async loginWithPasskey(): Promise<boolean> {
+    const storedPasskey = localStorage.getItem(PASSKEY_KEY);
+    if (!storedPasskey) {
+      return false;
+    }
+
+    // For now, just validate that we have a stored user
+    // In production, this would use WebAuthn to authenticate the passkey
+    return this.isLoggedIn();
   }
 
   // Update user profile
@@ -146,20 +169,13 @@ export class AuthService {
   // Logout
   logout(): void {
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(PASSKEY_KEY);
     this.currentUser = null;
   }
 
-  // Auto-login for first time users
-  async autoLogin(): Promise<UserAuthResponse> {
-    if (this.currentUser) {
-      return {
-        user: this.currentUser,
-        is_new: false,
-      };
-    }
-
-    // Create a temporary user account
-    return this.login();
+  // Check if user has a stored passkey
+  hasStoredPasskey(): boolean {
+    return localStorage.getItem(PASSKEY_KEY) !== null;
   }
 }
 

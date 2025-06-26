@@ -1,5 +1,6 @@
 import { FC, ReactNode, useEffect, useState } from 'react';
 import { authService, type User, type ChannelWithMembership } from '../services/auth';
+import { LoginForm } from './LoginForm';
 
 interface LayoutProps {
   children: ReactNode;
@@ -9,35 +10,55 @@ export const Layout: FC<LayoutProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [channels, setChannels] = useState<ChannelWithMembership[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    initializeAuth();
+    checkAuth();
   }, []);
 
-  const initializeAuth = async () => {
+  const checkAuth = async () => {
     try {
       setIsLoading(true);
       
-      // Auto-login (create temp account if needed)
-      const authResult = await authService.autoLogin();
-      setUser(authResult.user);
+      // Check if user is already logged in
+      const currentUser = authService.getCurrentUser();
+      if (currentUser) {
+        setUser(currentUser);
+        setIsAuthenticated(true);
+        await loadUserChannels();
+      } else {
+        setIsAuthenticated(false);
+      }
+    } catch (error) {
+      console.error('Failed to check auth:', error);
+      setIsAuthenticated(false);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-      // Load user's joined channels
+  const loadUserChannels = async () => {
+    try {
       const userChannels = await authService.getUserChannels();
       setChannels(userChannels);
     } catch (error) {
-      console.error('Failed to initialize auth:', error);
-    } finally {
-      setIsLoading(false);
+      console.error('Failed to load user channels:', error);
+    }
+  };
+
+  const handleLoginSuccess = async () => {
+    const currentUser = authService.getCurrentUser();
+    if (currentUser) {
+      setUser(currentUser);
+      setIsAuthenticated(true);
+      await loadUserChannels();
     }
   };
 
   const handleJoinChannel = async (instanceFqdn: string, channelName: string) => {
     try {
       await authService.joinChannel(instanceFqdn, channelName);
-      // Refresh channels list
-      const userChannels = await authService.getUserChannels();
-      setChannels(userChannels);
+      await loadUserChannels(); // Refresh channels list
     } catch (error) {
       console.error('Failed to join channel:', error);
     }
@@ -46,12 +67,17 @@ export const Layout: FC<LayoutProps> = ({ children }) => {
   const handleLeaveChannel = async (instanceFqdn: string, channelName: string) => {
     try {
       await authService.leaveChannel(instanceFqdn, channelName);
-      // Refresh channels list
-      const userChannels = await authService.getUserChannels();
-      setChannels(userChannels);
+      await loadUserChannels(); // Refresh channels list
     } catch (error) {
       console.error('Failed to leave channel:', error);
     }
+  };
+
+  const handleLogout = () => {
+    authService.logout();
+    setUser(null);
+    setChannels([]);
+    setIsAuthenticated(false);
   };
 
   if (isLoading) {
@@ -63,6 +89,10 @@ export const Layout: FC<LayoutProps> = ({ children }) => {
         </div>
       </div>
     );
+  }
+
+  if (!isAuthenticated) {
+    return <LoginForm onLoginSuccess={handleLoginSuccess} />;
   }
 
   return (
@@ -84,12 +114,16 @@ export const Layout: FC<LayoutProps> = ({ children }) => {
               <p className="text-xs text-gray-400 truncate">
                 {user?.username || 'guest'}
               </p>
-              {user?.is_temporary && (
-                <span className="inline-block px-2 py-1 text-xs bg-yellow-600 text-yellow-100 rounded mt-1">
-                  Temporary
-                </span>
-              )}
             </div>
+            <button
+              onClick={handleLogout}
+              className="text-gray-400 hover:text-white text-xs"
+              title="Logout"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+              </svg>
+            </button>
           </div>
         </div>
 
@@ -100,19 +134,12 @@ export const Layout: FC<LayoutProps> = ({ children }) => {
               <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wide">
                 Channels
               </h3>
-              <button 
-                onClick={() => handleJoinChannel('localhost:3001', 'general')}
-                className="text-gray-400 hover:text-white text-sm"
-                title="Join a channel"
-              >
-                +
-              </button>
             </div>
             
             {channels.length === 0 ? (
               <div className="text-center text-gray-500 py-8">
                 <p className="text-sm">No channels joined</p>
-                <p className="text-xs mt-1">Click + to join a channel</p>
+                <p className="text-xs mt-1">Discover channels to join</p>
               </div>
             ) : (
               <div className="space-y-1">
@@ -128,21 +155,18 @@ export const Layout: FC<LayoutProps> = ({ children }) => {
           </div>
         </div>
 
-        {/* Quick Actions */}
+        {/* Navigation */}
         <div className="p-4 border-t border-gray-700">
           <div className="space-y-2">
-            <button
-              onClick={() => handleJoinChannel('localhost:3001', 'general')}
-              className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-gray-700 rounded"
+            <a
+              href="/"
+              className="flex items-center w-full text-left px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-gray-700 rounded"
             >
-              Join #general
-            </button>
-            <button
-              onClick={() => handleJoinChannel('v3x.vc', 'community')}
-              className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-gray-700 rounded"
-            >
-              Join v3x.vc#community
-            </button>
+              <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              Discover Channels
+            </a>
           </div>
         </div>
       </div>

@@ -256,8 +256,8 @@ impl Api {
         &self,
         request: Json<CreateUserRequest>,
     ) -> poem_openapi::payload::Json<UserAuthResponse> {
-        let result = User::create_or_get(&self.state.db.pool, request.0).await
-            .expect("Failed to create or get user");
+        let result = User::create(&self.state.db.pool, request.0).await
+            .expect("Failed to create user");
 
         poem_openapi::payload::Json(result)
     }

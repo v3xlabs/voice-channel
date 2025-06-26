@@ -31,6 +31,11 @@ This project will most likely be running in a kubernetes cluster, and will requi
 The web app is a react app that uses the openapi schema generated when the `pnpm dev` command is run.
 It then uses `openapi-hooks` to wrap the openapi schema and turn it into a usable fetch-like function that can be used within tanstack query hooks.
 
+### Server
+
+The server should use poem and poem_openapi for the api.
+The openapi.json should be exposed at `/openapi.json` the docs available at `/docs` and the api at `/api`.
+
 ### Mediasoup
 
 https://mediasoup.org/documentation/overview/

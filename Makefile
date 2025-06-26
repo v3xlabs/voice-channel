@@ -8,6 +8,7 @@ help:
 	@echo "  make setup          - Initial project setup"
 	@echo ""
 	@echo "Development:"
+	@echo "  make docker-dev     - Start development dependencies (PostgreSQL, Redis)"
 	@echo "  make dev            - Start both backend and frontend"
 	@echo "  make dev-backend    - Start only backend"
 	@echo "  make dev-frontend   - Start only frontend"

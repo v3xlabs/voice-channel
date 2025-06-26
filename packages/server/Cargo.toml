@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 # Web framework
-poem = { version = "3.0", features = ["compression", "cors", "static-files"] }
+poem = { version = "3.0", features = ["compression", "static-files"] }
 poem-openapi = { version = "5.0", features = ["chrono", "uuid"] }
 tokio = { version = "1.0", features = ["full"] }
 

@@ -4,7 +4,7 @@ use poem::{
     middleware::Cors,
     EndpointExt, Route, Server,
 };
-use poem_openapi::{OpenApi, OpenApiService};
+use poem_openapi::OpenApiService;
 use std::sync::Arc;
 use tracing::{info, Level};
 
@@ -47,14 +47,18 @@ async fn main() -> Result<()> {
         .server("http://localhost:3001/api");
     
     // Build the app with OpenAPI docs
-    let ui = api_service.swagger_ui();
     let spec = api_service.spec_endpoint();
+    
+    // Configure CORS
+    let cors = Cors::new()
+        .allow_origin("http://localhost:3000")
+        .allow_methods(vec!["GET", "POST", "PUT", "DELETE", "OPTIONS"])
+        .allow_headers(vec!["content-type", "authorization"]);
     
     let app = Route::new()
         .nest("/api", api_service)
-        .nest("/swagger-ui", ui)
         .nest("/api-docs", spec)
-        .with(Cors::new());
+        .with(cors);
 
     // Start server
     info!("Server running on http://0.0.0.0:3001");

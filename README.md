@@ -34,7 +34,7 @@ A fair, simple, and reliable voice, video, and screen sharing system built with 
 - Rust (1.75+) for local development
 - Node.js (18+) for local development
 
-### Using Docker Compose (Recommended)
+### Using Docker Compose - Production
 
 1. Clone the repository:
 ```bash
@@ -44,7 +44,7 @@ cd voice-channel
 
 2. Start all services:
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 3. Access the application:
@@ -57,16 +57,11 @@ docker-compose up -d
 ```bash
 cd packages/server
 
+# Start development dependencies (PostgreSQL, Redis)
+docker compose up -d
+
 # Copy environment file
 cp env.example .env
-
-# Start PostgreSQL (or use Docker)
-docker run -d --name postgres \
-  -e POSTGRES_DB=voice_channel \
-  -e POSTGRES_USER=postgres \
-  -e POSTGRES_PASSWORD=password \
-  -p 5432:5432 \
-  postgres:15
 
 # Run the server
 cargo run

@@ -2,7 +2,6 @@ use poem_openapi::{payload::Json, OpenApi, ApiResponse, Object};
 use std::sync::Arc;
 
 use crate::{
-    error::AppError,
     models::channel::{Channel, CreateChannelRequest},
     AppState,
 };

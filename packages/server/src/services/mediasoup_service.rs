@@ -3,29 +3,13 @@ use anyhow::Result;
 use dashmap::DashMap;
 use uuid::Uuid;
 use tracing::info;
+use crate::models::webrtc::*;
+use crate::models::participant::Participant;
 
-use crate::models::webrtc::{
-    RtpCapabilities as ApiRtpCapabilities, 
-    TransportInfo, 
-    IceParameters as ApiIceParameters, 
-    DtlsParameters as ApiDtlsParameters, 
-    DtlsFingerprint as ApiDtlsFingerprint,
-    IceCandidate as ApiIceCandidate,
-    RtpCodecCapability as ApiRtpCodecCapability,
-    RtpHeaderExtension as ApiRtpHeaderExtension,
-};
-
-#[derive(Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct ChannelRoom {
     pub id: Uuid,
-    pub participants: Arc<DashMap<String, ParticipantInfo>>,
-}
-
-#[derive(Debug, Clone)]
-pub struct ParticipantInfo {
-    pub id: String,
-    pub user_id: String,
-    pub display_name: String,
+    pub participants: Arc<DashMap<String, Participant>>,
 }
 
 // Simulated MediasoupService for development
@@ -40,7 +24,7 @@ pub struct MediasoupService {
 impl MediasoupService {
     pub async fn new() -> Result<Self> {
         info!("Initializing MediasoupService with simulation implementation");
-        
+
         Ok(Self {
             rooms: Arc::new(DashMap::new()),
             transports: Arc::new(DashMap::new()),
@@ -65,10 +49,10 @@ impl MediasoupService {
         Ok(room)
     }
 
-    pub fn get_router_rtp_capabilities(&self, _channel_id: Uuid) -> Result<ApiRtpCapabilities> {
+    pub fn get_router_rtp_capabilities(&self, _channel_id: Uuid) -> Result<RtpCapabilities> {
         // Return mock RTP capabilities for simulation
         let codecs = vec![
-            ApiRtpCodecCapability {
+            RtpCodecCapability {
                 kind: "audio".to_string(),
                 mime_type: "audio/opus".to_string(),
                 clock_rate: 48000,
@@ -78,7 +62,7 @@ impl MediasoupService {
                     "useinbandfec": 1
                 }),
             },
-            ApiRtpCodecCapability {
+            RtpCodecCapability {
                 kind: "video".to_string(),
                 mime_type: "video/VP8".to_string(),
                 clock_rate: 90000,
@@ -88,17 +72,17 @@ impl MediasoupService {
         ];
 
         let header_extensions = vec![
-            ApiRtpHeaderExtension {
+            RtpHeaderExtension {
                 uri: "urn:ietf:params:rtp-hdrext:sdes:mid".to_string(),
                 id: 1,
             },
-            ApiRtpHeaderExtension {
+            RtpHeaderExtension {
                 uri: "urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id".to_string(),
                 id: 2,
             },
         ];
 
-        Ok(ApiRtpCapabilities {
+        Ok(RtpCapabilities {
             codecs,
             header_extensions,
         })
@@ -112,19 +96,19 @@ impl MediasoupService {
     ) -> Result<TransportInfo> {
         // Generate mock transport ID
         let transport_id = Uuid::new_v4().to_string();
-        
+
         // Store mock transport data
         self.transports.insert(transport_id.clone(), ("mock_transport".to_string(), channel_id));
-
+        
         // Return mock transport info
         let transport_info = TransportInfo {
             id: transport_id,
-            ice_parameters: ApiIceParameters {
+            ice_parameters: IceParameters {
                 username_fragment: format!("sim{}", &Uuid::new_v4().to_string()[..8]),
                 password: Uuid::new_v4().to_string(),
             },
             ice_candidates: vec![
-                ApiIceCandidate {
+                IceCandidate {
                     foundation: "1".to_string(),
                     priority: 2113667326,
                     ip: "127.0.0.1".to_string(),
@@ -133,10 +117,10 @@ impl MediasoupService {
                     protocol: "udp".to_string(),
                 }
             ],
-            dtls_parameters: ApiDtlsParameters {
+            dtls_parameters: DtlsParameters {
                 role: "auto".to_string(),
                 fingerprints: vec![
-                    ApiDtlsFingerprint {
+                    DtlsFingerprint {
                         algorithm: "sha-256".to_string(),
                         value: "E7:8A:84:3D:25:BC:55:1F:2C:65:32:FA:12:34:56:78:9A:BC:DE:F0:12:34:56:78:9A:BC:DE:F0:12:34:56:78".to_string(),
                     }
@@ -151,7 +135,7 @@ impl MediasoupService {
     pub async fn connect_transport(
         &self,
         transport_id: &str,
-        _dtls_parameters: &ApiDtlsParameters,
+        _dtls_parameters: &DtlsParameters,
     ) -> Result<()> {
         if !self.transports.contains_key(transport_id) {
             return Err(anyhow::anyhow!("Transport not found: {}", transport_id));
@@ -161,7 +145,7 @@ impl MediasoupService {
         Ok(())
     }
 
-    pub async fn produce(
+    pub async fn create_producer(
         &self,
         transport_id: &str,
         kind: &str,
@@ -181,22 +165,22 @@ impl MediasoupService {
         Ok(producer_id)
     }
 
-    pub async fn consume(
+    pub async fn create_consumer(
         &self,
         transport_id: &str,
         producer_id: &str,
-        _rtp_capabilities: &ApiRtpCapabilities,
-    ) -> Result<(String, String, serde_json::Value)> {
+        _rtp_capabilities: &RtpCapabilities,
+    ) -> Result<ConsumeResponse> {
         let transport_entry = self.transports.get(transport_id)
             .ok_or_else(|| anyhow::anyhow!("Transport not found: {}", transport_id))?;
         let channel_id = transport_entry.1;
 
-        let producer_entry = self.producers.get(producer_id)
+        let _producer_entry = self.producers.get(producer_id)
             .ok_or_else(|| anyhow::anyhow!("Producer not found: {}", producer_id))?;
 
         // Generate mock consumer ID
         let consumer_id = Uuid::new_v4().to_string();
-        
+
         // Store mock consumer data
         self.consumers.insert(consumer_id.clone(), (format!("mock_consumer_for_{}", producer_id), channel_id));
 
@@ -213,11 +197,16 @@ impl MediasoupService {
         });
 
         info!("Created simulated consumer {} for producer {} on transport {}", consumer_id, producer_id, transport_id);
-        Ok((consumer_id, "audio".to_string(), rtp_parameters))
+        Ok(ConsumeResponse {
+            consumer_id,
+            producer_id: producer_id.to_string(),
+            kind: "audio".to_string(),
+            rtp_parameters,
+        })
     }
 
     pub async fn close_room(&self, channel_id: Uuid) -> Result<()> {
-        if let Some((_, room)) = self.rooms.remove(&channel_id) {
+        if let Some((_key, _room)) = self.rooms.remove(&channel_id) {
             info!("Closed simulated room for channel {}", channel_id);
         }
         Ok(())

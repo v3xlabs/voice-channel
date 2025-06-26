@@ -97,14 +97,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/channels/{id}": {
+    "/channels/id/{id}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Get a specific channel */
+        /** Get a specific channel by ID */
         get: {
             parameters: {
                 query?: never;
@@ -134,7 +134,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/channels/{channel_id}/join": {
+    "/channels/name/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get a specific channel by name */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    name: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["Channel"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/channels/{channel_name}/join": {
         parameters: {
             query?: never;
             header?: never;
@@ -149,7 +186,7 @@ export interface paths {
                 query?: never;
                 header?: never;
                 path: {
-                    channel_id: string;
+                    channel_name: string;
                 };
                 cookie?: never;
             };
@@ -175,7 +212,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/channels/{channel_id}/rtp-capabilities": {
+    "/channels/{channel_name}/rtp-capabilities": {
         parameters: {
             query?: never;
             header?: never;
@@ -188,7 +225,7 @@ export interface paths {
                 query?: never;
                 header?: never;
                 path: {
-                    channel_id: string;
+                    channel_name: string;
                 };
                 cookie?: never;
             };
@@ -212,7 +249,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/channels/{channel_id}/transports": {
+    "/channels/{channel_name}/transports": {
         parameters: {
             query?: never;
             header?: never;
@@ -227,7 +264,7 @@ export interface paths {
                 query?: never;
                 header?: never;
                 path: {
-                    channel_id: string;
+                    channel_name: string;
                 };
                 cookie?: never;
             };
@@ -376,7 +413,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/channels/{channel_id}/participants": {
+    "/channels/{channel_name}/participants": {
         parameters: {
             query?: never;
             header?: never;
@@ -389,7 +426,7 @@ export interface paths {
                 query?: never;
                 header?: never;
                 path: {
-                    channel_id: string;
+                    channel_name: string;
                 };
                 cookie?: never;
             };

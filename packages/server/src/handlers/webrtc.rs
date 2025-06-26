@@ -155,7 +155,7 @@ impl WebRtcApi {
     ) -> poem_openapi::payload::Json<ProduceResponse> {
         let transport_id = id.as_str();
 
-        let producer_id = self.mediasoup_service.produce(
+        let producer_id = self.mediasoup_service.create_producer(
             transport_id,
             &request.kind,
             request.rtp_parameters.clone(),
@@ -177,18 +177,13 @@ impl WebRtcApi {
     ) -> poem_openapi::payload::Json<ConsumeResponse> {
         let transport_id = id.as_str();
 
-        let (consumer_id, kind, rtp_parameters) = self.mediasoup_service.consume(
+        let consume_response = self.mediasoup_service.create_consumer(
             transport_id,
             &request.producer_id,
             &request.rtp_capabilities,
         ).await.expect("Failed to create consumer");
 
-        let response = ConsumeResponse {
-            consumer_id,
-            producer_id: request.producer_id.clone(),
-            kind,
-            rtp_parameters,
-        };
+        let response = consume_response;
 
         poem_openapi::payload::Json(response)
     }

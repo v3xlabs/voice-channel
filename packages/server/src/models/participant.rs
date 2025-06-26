@@ -22,6 +22,44 @@ pub struct JoinChannelRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize, Object)]
+pub struct ParticipantJoinRequest {
+    pub user_id: String,
+    pub display_name: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Object)]
+pub struct ParticipantJoinResponse {
+    pub participant_id: String,
+    pub user_id: String,
+    pub display_name: String,
+    pub audio_enabled: bool,
+    pub video_enabled: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Object)]
+pub struct ParticipantLeaveRequest {
+    pub participant_id: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Object)]
+pub struct ParticipantLeaveResponse {
+    pub success: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Object)]
+pub struct ParticipantUpdateRequest {
+    pub audio_enabled: Option<bool>,
+    pub video_enabled: Option<bool>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Object)]
+pub struct ParticipantUpdateResponse {
+    pub participant_id: String,
+    pub audio_enabled: bool,
+    pub video_enabled: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Object)]
 pub struct ParticipantUpdate {
     pub is_audio_enabled: Option<bool>,
     pub is_video_enabled: Option<bool>,

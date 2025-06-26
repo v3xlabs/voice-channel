@@ -72,6 +72,11 @@ pub struct ConnectTransportRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize, Object)]
+pub struct ConnectTransportResponse {
+    pub success: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Object)]
 pub struct ProduceRequest {
     pub transport_id: String,
     pub kind: String, // "audio" or "video"

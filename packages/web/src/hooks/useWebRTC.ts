@@ -55,12 +55,7 @@ export const useWebRTC = ({ channelId, userId, displayName }: UseWebRTCOptions) 
       const participant = await webrtcService.joinChannel(
         channelId,
         userId,
-        displayName,
-        {
-          onParticipantJoined: handleParticipantJoined,
-          onParticipantLeft: handleParticipantLeft,
-          onParticipantUpdated: handleParticipantUpdated,
-        }
+        displayName
       );
 
       setLocalParticipant(participant);
@@ -71,7 +66,7 @@ export const useWebRTC = ({ channelId, userId, displayName }: UseWebRTCOptions) 
     } finally {
       setIsConnecting(false);
     }
-  }, [channelId, userId, displayName, isConnected, isConnecting, handleParticipantJoined, handleParticipantLeft, handleParticipantUpdated]);
+  }, [channelId, userId, displayName, isConnected, isConnecting]);
 
   const disconnect = useCallback(async () => {
     if (!isConnected) return;

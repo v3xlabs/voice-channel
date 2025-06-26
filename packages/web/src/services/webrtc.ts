@@ -18,32 +18,38 @@ export class WebRTCService {
   private localParticipant?: Participant;
   private channelId?: string;
 
-  async joinChannel(channelId: string, userId: string, displayName: string): Promise<void> {
+  async initialize(): Promise<void> {
+    // Initialize any global WebRTC setup here
+    // For now, this is just a placeholder that ensures the service is ready
+    console.log('✅ WebRTC service initialized');
+  }
+
+  async joinChannel(channelId: string, userId: string, displayName: string): Promise<Participant> {
     this.channelId = channelId;
 
     try {
       // Join channel on server using openapi-hooks
-      // Use the exact OpenAPI path format
-      const joinResponse = await apiFetch('/channels/{channel_id}/join', 'post', {
-        path: { channel_id: channelId },
+      // Use the correct OpenAPI path format with channel_name instead of channel_id
+      const joinResponse = await apiFetch('/channels/{channel_name}/join', 'post', {
+        path: { channel_name: channelId },
         contentType: "application/json; charset=utf-8",
         data: { user_id: userId, display_name: displayName },
       });
 
-      // openapi-hooks automatically types the response, access data property
+      // Extract participant data from response
       const participantData = joinResponse.data;
       
       this.localParticipant = {
         id: participantData.id,
         userId: participantData.user_id,
         displayName: participantData.display_name,
-        isAudioEnabled: false,
-        isVideoEnabled: false,
+        isAudioEnabled: participantData.is_audio_enabled,
+        isVideoEnabled: participantData.is_video_enabled,
       };
 
       // Get router RTP capabilities using openapi-hooks
-      const rtpCapabilitiesResponse = await apiFetch('/channels/{channel_id}/rtp-capabilities', 'get', {
-        path: { channel_id: channelId },
+      const rtpCapabilitiesResponse = await apiFetch('/channels/{channel_name}/rtp-capabilities', 'get', {
+        path: { channel_name: channelId },
       });
       
       const backendRtpCapabilities = rtpCapabilitiesResponse.data;
@@ -73,6 +79,9 @@ export class WebRTCService {
       await this.device.load({ routerRtpCapabilities: simpleRtpCapabilities });
 
       console.log('✅ Device loaded successfully');
+
+      // Return the local participant
+      return this.localParticipant;
 
     } catch (error) {
       console.error('Failed to join channel:', error);

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently \"pnpm dev:openapi\" \"vite\"",
-    "dev:openapi": "openapi-typescript http://localhost:3001/openapi.json -o src/types/api.ts --watch",
+    "dev:openapi": "openapi-typescript http://localhost:3001/api-docs/openapi.json -o src/types/api.ts --watch",
     "build": "tsc && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
@@ -15,9 +15,10 @@
     "react-dom": "^18.2.0",
     "@tanstack/react-router": "^1.58.3",
     "@tanstack/react-query": "^5.56.2",
-    "@radix-ui/react-slot": "^1.2.3",
-    "@radix-ui/react-dialog": "^1.1.14",
-    "@radix-ui/react-label": "^2.1.7",
+    "@radix-ui/react-slot": "^1.1.0",
+    "@radix-ui/react-dialog": "^1.1.1",
+    "@radix-ui/react-button": "^1.1.0",
+    "@radix-ui/react-label": "^1.1.0",
     "lucide-react": "^0.294.0",
     "openapi-fetch": "^0.12.0"
   },

@@ -39,60 +39,60 @@ async function apiFetch<T>(endpoint: string, options: RequestInit = {}): Promise
 export const apiClient = {
   // Health check
   healthCheck: (): Promise<string> =>
-    apiFetch('/health'),
+    apiFetch('/api/health'),
 
   // Channel operations
   getChannels: (): Promise<Channel[]> =>
-    apiFetch('/channels'),
+    apiFetch('/api/channels'),
   
   getChannel: (id: string): Promise<Channel> =>
-    apiFetch(`/channels/${id}`),
+    apiFetch(`/api/channels/${id}`),
   
   createChannel: (data: CreateChannelRequest): Promise<Channel> =>
-    apiFetch('/channels', {
+    apiFetch('/api/channels', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
   // WebRTC operations
   joinChannel: (channelId: string, data: JoinChannelRequest): Promise<Participant> =>
-    apiFetch(`/channels/${channelId}/join`, {
+    apiFetch(`/api/channels/${channelId}/join`, {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
   getRtpCapabilities: (channelId: string): Promise<RtpCapabilities> =>
-    apiFetch(`/channels/${channelId}/rtp-capabilities`),
+    apiFetch(`/api/channels/${channelId}/rtp-capabilities`),
 
   createTransport: (channelId: string, data: CreateTransportRequest): Promise<TransportInfo> =>
-    apiFetch(`/channels/${channelId}/transports`, {
+    apiFetch(`/api/channels/${channelId}/transports`, {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
   connectTransport: (transportId: string, data: ConnectTransportRequest): Promise<unknown> =>
-    apiFetch(`/transports/${transportId}/connect`, {
+    apiFetch(`/api/transports/${transportId}/connect`, {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
   produce: (transportId: string, data: ProduceRequest): Promise<ProduceResponse> =>
-    apiFetch(`/transports/${transportId}/produce`, {
+    apiFetch(`/api/transports/${transportId}/produce`, {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
   consume: (transportId: string, data: ConsumeRequest): Promise<ConsumeResponse> =>
-    apiFetch(`/transports/${transportId}/consume`, {
+    apiFetch(`/api/transports/${transportId}/consume`, {
       method: 'POST',
       body: JSON.stringify(data),
     }),
 
   getParticipants: (channelId: string): Promise<Participant[]> =>
-    apiFetch(`/channels/${channelId}/participants`),
+    apiFetch(`/api/channels/${channelId}/participants`),
 
   updateParticipant: (participantId: string, data: ParticipantUpdate): Promise<unknown> =>
-    apiFetch(`/participants/${participantId}`, {
+    apiFetch(`/api/participants/${participantId}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     }),

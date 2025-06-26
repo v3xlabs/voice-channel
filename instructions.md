@@ -36,6 +36,10 @@ It then uses `openapi-hooks` to wrap the openapi schema and turn it into a usabl
 The server should use poem and poem_openapi for the api.
 The openapi.json should be exposed at `/openapi.json` the docs available at `/docs` and the api at `/api`.
 
+Use scalar for the documentation. It can be imported using include_str!("docs.html")
+
+With regards to repository setup look at the https://github.com/v3xlabs/ethereum-forum/blob/master/app/src/server/index.html as a reference.
+
 ### Mediasoup
 
 https://mediasoup.org/documentation/overview/

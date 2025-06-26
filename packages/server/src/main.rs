@@ -2,6 +2,7 @@ use anyhow::Result;
 use poem::{
     listener::TcpListener,
     middleware::Cors,
+    web::Html,
     EndpointExt, Route, Server,
 };
 use poem_openapi::OpenApiService;
@@ -46,8 +47,8 @@ async fn main() -> Result<()> {
     let api_service = OpenApiService::new(Api { state }, "Voice Channel API", "1.0")
         .server("http://localhost:3001/api");
     
-    // Build the app with OpenAPI docs
-    let spec = api_service.spec_endpoint();
+    // Get OpenAPI spec
+    let spec = api_service.spec();
     
     // Configure CORS
     let cors = Cors::new()
@@ -55,13 +56,25 @@ async fn main() -> Result<()> {
         .allow_methods(vec!["GET", "POST", "PUT", "DELETE", "OPTIONS"])
         .allow_headers(vec!["content-type", "authorization"]);
     
+    // Scalar documentation HTML
+    let docs_html = include_str!("docs.html");
+    
     let app = Route::new()
         .nest("/api", api_service)
-        .nest("/api-docs", spec)
+        .at("/openapi.json", poem::endpoint::make_sync(move |_| {
+            poem::Response::builder()
+                .header("content-type", "application/json")
+                .body(spec.clone())
+        }))
+        .at("/docs", poem::endpoint::make_sync(move |_| {
+            Html(docs_html)
+        }))
         .with(cors);
 
     // Start server
     info!("Server running on http://0.0.0.0:3001");
+    info!("API documentation available at http://0.0.0.0:3001/docs");
+    info!("OpenAPI spec available at http://0.0.0.0:3001/openapi.json");
     Server::new(TcpListener::bind("0.0.0.0:3001"))
         .run(app)
         .await?;

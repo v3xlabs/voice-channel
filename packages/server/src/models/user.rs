@@ -11,7 +11,6 @@ pub struct User {
     pub username: String,
     pub display_name: String,
     pub instance_fqdn: String,
-    pub is_temporary: bool,
     pub is_admin: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -58,7 +57,7 @@ impl User {
             r#"
             INSERT INTO users (id, username, display_name, instance_fqdn)
             VALUES ($1, $2, $3, $4)
-            RETURNING id, username, display_name, instance_fqdn, is_temporary, is_admin, created_at, updated_at
+            RETURNING id, username, display_name, instance_fqdn, is_admin, created_at, updated_at
             "#,
             Uuid::new_v4(),
             username,
@@ -73,7 +72,6 @@ impl User {
             username: user.username,
             display_name: user.display_name,
             instance_fqdn: user.instance_fqdn,
-            is_temporary: user.is_temporary,
             is_admin: user.is_admin,
             created_at: user.created_at,
             updated_at: user.updated_at,
@@ -107,7 +105,7 @@ impl User {
     /// Find user by ID
     pub async fn find_by_id(pool: &PgPool, id: Uuid) -> Result<Option<User>> {
         let user = sqlx::query!(
-            "SELECT id, username, display_name, instance_fqdn, is_temporary, is_admin, created_at, updated_at FROM users WHERE id = $1",
+            "SELECT id, username, display_name, instance_fqdn, is_admin, created_at, updated_at FROM users WHERE id = $1",
             id
         )
         .fetch_optional(pool)
@@ -118,7 +116,6 @@ impl User {
             username: row.username,
             display_name: row.display_name,
             instance_fqdn: row.instance_fqdn,
-            is_temporary: row.is_temporary,
             is_admin: row.is_admin,
             created_at: row.created_at,
             updated_at: row.updated_at,
@@ -128,7 +125,7 @@ impl User {
     /// Find user by username and instance
     pub async fn find_by_username(pool: &PgPool, username: &str, instance_fqdn: &str) -> Result<Option<User>> {
         let user = sqlx::query!(
-            "SELECT id, username, display_name, instance_fqdn, is_temporary, is_admin, created_at, updated_at FROM users WHERE username = $1 AND instance_fqdn = $2",
+            "SELECT id, username, display_name, instance_fqdn, is_admin, created_at, updated_at FROM users WHERE username = $1 AND instance_fqdn = $2",
             username,
             instance_fqdn
         )
@@ -140,7 +137,6 @@ impl User {
             username: row.username,
             display_name: row.display_name,
             instance_fqdn: row.instance_fqdn,
-            is_temporary: row.is_temporary,
             is_admin: row.is_admin,
             created_at: row.created_at,
             updated_at: row.updated_at,
@@ -155,7 +151,7 @@ impl User {
             SET display_name = COALESCE($2, display_name),
                 updated_at = NOW()
             WHERE id = $1
-            RETURNING id, username, display_name, instance_fqdn, is_temporary, is_admin, created_at, updated_at
+            RETURNING id, username, display_name, instance_fqdn, is_admin, created_at, updated_at
             "#,
             id,
             request.display_name
@@ -168,7 +164,6 @@ impl User {
             username: user.username,
             display_name: user.display_name,
             instance_fqdn: user.instance_fqdn,
-            is_temporary: user.is_temporary,
             is_admin: user.is_admin,
             created_at: user.created_at,
             updated_at: user.updated_at,

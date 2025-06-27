@@ -163,7 +163,7 @@ impl ChannelMembership {
                 u.username,
                 u.display_name,
                 u.instance_fqdn,
-                u.is_temporary,
+                u.is_admin,
                 u.created_at,
                 u.updated_at
             FROM channel_memberships cm
@@ -184,7 +184,7 @@ impl ChannelMembership {
                 username: row.username,
                 display_name: row.display_name,
                 instance_fqdn: row.instance_fqdn,
-                is_temporary: row.is_temporary,
+                is_admin: row.is_admin,
                 created_at: row.created_at,
                 updated_at: row.updated_at,
             })

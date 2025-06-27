@@ -210,19 +210,27 @@ const ChannelItem: FC<ChannelItemProps> = ({ channelWithMembership, onLeave }) =
   const displayName = channel?.name || membership.channel_name;
   const instanceDisplay = is_local ? '' : `${membership.channel_instance_fqdn}/`;
   
+  // Build the channel URL
+  const channelUrl = is_local 
+    ? `/${membership.channel_name}`
+    : `/${membership.channel_instance_fqdn}/${membership.channel_name}`;
+  
   return (
     <div className="group flex items-center justify-between px-3 py-2 rounded hover:bg-gray-700">
-      <div className="flex items-center space-x-2 flex-1 min-w-0">
+      <a 
+        href={channelUrl}
+        className="flex items-center space-x-2 flex-1 min-w-0 text-left"
+      >
         <span className="text-gray-400">#</span>
-        <span className="text-sm text-white truncate">
-          {instanceDisplay}{displayName}
+        <span className="text-sm text-white truncate hover:text-blue-300 transition-colors">
+          {displayName}
         </span>
         {!is_local && (
           <span className="text-xs text-blue-400 bg-blue-900 px-1 rounded">
             remote
           </span>
         )}
-      </div>
+      </a>
       
       <button
         onClick={() => onLeave(membership.channel_instance_fqdn, membership.channel_name)}

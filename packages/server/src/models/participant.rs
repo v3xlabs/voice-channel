@@ -18,7 +18,6 @@ pub struct Participant {
 #[derive(Debug, Serialize, Deserialize, Object)]
 pub struct JoinChannelRequest {
     pub user_id: String,
-    pub display_name: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Object)]

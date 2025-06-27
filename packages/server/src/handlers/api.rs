@@ -95,17 +95,24 @@ impl Api {
             .expect("Failed to query channel")
             .expect("Channel not found");
 
+        // Get user information
+        let user_uuid = Uuid::parse_str(&request.user_id)
+            .expect("Invalid user ID format");
+        let user = User::find_by_id(&self.state.db.pool, user_uuid).await
+            .expect("Failed to query user")
+            .expect("User not found");
+
         // Ensure mediasoup room exists
         self.state.mediasoup.get_or_create_room(channel.id).await
             .expect("Failed to create mediasoup room");
 
-        // Create participant
+        // Create participant using user's display name
         let peer_id = Uuid::new_v4().to_string();
         let participant = Participant::new(
             channel.id,
             request.user_id.clone(),
             peer_id,
-            request.display_name.clone(),
+            user.display_name,
         );
 
         // Add participant to service

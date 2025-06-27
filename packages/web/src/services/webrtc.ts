@@ -33,7 +33,7 @@ export class WebRTCService {
       const joinResponse = await apiFetch('/channels/{channel_name}/join', 'post', {
         path: { channel_name: channelId },
         contentType: "application/json; charset=utf-8",
-        data: { user_id: userId, display_name: displayName },
+        data: { user_id: userId },
       });
 
       // Extract participant data from response

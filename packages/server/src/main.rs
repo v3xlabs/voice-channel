@@ -5,6 +5,10 @@ use poem::{
     web::Html,
     EndpointExt, Route, Server,
 };
+use tower::ServiceBuilder;
+use tower_governor::{
+    governor::GovernorConfigBuilder, key_extractor::SmartIpKeyExtractor, GovernorLayer,
+};
 use poem_openapi::OpenApiService;
 use std::sync::Arc;
 use tracing::{info, Level};
@@ -21,6 +25,7 @@ use database::Database;
 use handlers::api::Api;
 use services::mediasoup_service::MediasoupService;
 use services::participant_service::ParticipantService;
+use services::webauthn::WebAuthnService;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -28,6 +33,7 @@ pub struct AppState {
     pub config: Config,
     pub mediasoup: Arc<MediasoupService>,
     pub participants: Arc<ParticipantService>,
+    pub webauthn: Arc<WebAuthnService>,
 }
 
 #[tokio::main]
@@ -53,12 +59,22 @@ async fn main() -> Result<()> {
     // Initialize participant service
     let participants = Arc::new(ParticipantService::new());
 
+    // Initialize WebAuthn service
+    let webauthn_origin = format!("http://localhost:3001");
+    let webauthn_rp_id = "localhost";
+    let webauthn = Arc::new(WebAuthnService::new(
+        &webauthn_origin,
+        webauthn_rp_id,
+        config.instance_fqdn.clone(),
+    )?);
+
     // Create shared application state
     let state = Arc::new(AppState { 
         db, 
         config,
         mediasoup,
         participants,
+        webauthn,
     });
 
     // Create unified API service that includes both channel and WebRTC endpoints
@@ -72,6 +88,17 @@ async fn main() -> Result<()> {
         .allow_origin_regex("*")
         .allow_methods(vec!["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"])
         .allow_headers(vec!["content-type", "authorization"]);
+    
+    // Configure rate limiting for registration (2 requests per IP per day)
+    let rate_limit_config = GovernorConfigBuilder::default()
+        .per_second(2)  // Allow 2 requests
+        .burst_size(2)  // Burst size of 2
+        .per_nanosecond(24 * 60 * 60 * 1_000_000_000) // Per day (24 hours in nanoseconds)
+        .key_extractor(SmartIpKeyExtractor::default())
+        .finish()
+        .expect("Failed to create rate limit config");
+    
+    let rate_limiter = GovernorLayer::new(&rate_limit_config);
     
     // Scalar documentation HTML
     let docs_html = include_str!("docs.html");

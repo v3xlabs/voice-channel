@@ -1,5 +1,7 @@
 import { apiFetch } from './api';
 import type { components } from '../types/api';
+import { startRegistration, startAuthentication } from '@simplewebauthn/browser';
+import type { PublicKeyCredentialCreationOptionsJSON, PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/browser';
 
 // Type definitions
 export type User = components['schemas']['User'];

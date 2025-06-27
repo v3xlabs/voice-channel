@@ -14,6 +14,11 @@ use crate::{
         membership::{ChannelMembership, ChannelWithMembership, JoinChannelMembershipRequest},
         instance_settings::InstanceSettings,
         invitation::Invitation,
+        webauthn::{
+            RegisterBeginRequest, RegisterBeginResponse, RegisterFinishRequest, RegisterFinishResponse,
+            LoginBeginRequest, LoginBeginResponse, LoginFinishRequest, LoginFinishResponse,
+            CredentialInfo,
+        },
     },
     AppState,
 };
@@ -416,5 +421,91 @@ impl Api {
         } else {
             poem_openapi::payload::Json(None)
         }
+    }
+
+    // WebAuthn Endpoints
+
+    /// Start WebAuthn registration
+    #[oai(path = "/auth/register/begin", method = "post", tag = "ApiTags::Auth")]
+    async fn register_begin(
+        &self,
+        request: Json<RegisterBeginRequest>,
+    ) -> poem_openapi::payload::Json<RegisterBeginResponse> {
+        let result = self.state.webauthn.register_begin(&self.state.db.pool, request.0).await
+            .expect("Failed to start registration");
+
+        poem_openapi::payload::Json(result)
+    }
+
+    /// Finish WebAuthn registration
+    #[oai(path = "/auth/register/finish", method = "post", tag = "ApiTags::Auth")]
+    async fn register_finish(
+        &self,
+        request: Json<RegisterFinishRequest>,
+    ) -> poem_openapi::payload::Json<RegisterFinishResponse> {
+        let result = self.state.webauthn.register_finish(&self.state.db.pool, request.0).await
+            .expect("Failed to finish registration");
+
+        poem_openapi::payload::Json(result)
+    }
+
+    /// Start WebAuthn authentication
+    #[oai(path = "/auth/login/begin", method = "post", tag = "ApiTags::Auth")]
+    async fn login_begin(
+        &self,
+        request: Json<LoginBeginRequest>,
+    ) -> poem_openapi::payload::Json<LoginBeginResponse> {
+        let result = self.state.webauthn.login_begin(&self.state.db.pool, request.0).await
+            .expect("Failed to start authentication");
+
+        poem_openapi::payload::Json(result)
+    }
+
+    /// Finish WebAuthn authentication
+    #[oai(path = "/auth/login/finish", method = "post", tag = "ApiTags::Auth")]
+    async fn login_finish(
+        &self,
+        request: Json<LoginFinishRequest>,
+    ) -> poem_openapi::payload::Json<LoginFinishResponse> {
+        let result = self.state.webauthn.login_finish(&self.state.db.pool, request.0).await
+            .expect("Failed to finish authentication");
+
+        poem_openapi::payload::Json(result)
+    }
+
+    /// Get user's credentials
+    #[oai(path = "/auth/credentials", method = "get", tag = "ApiTags::Auth")]
+    async fn get_user_credentials(
+        &self,
+        user_id: poem_openapi::param::Query<String>,
+    ) -> poem_openapi::payload::Json<Vec<CredentialInfo>> {
+        let user_uuid = Uuid::parse_str(&user_id.0)
+            .expect("Invalid user ID format");
+
+        let credentials = self.state.webauthn.get_user_credentials(&self.state.db.pool, user_uuid).await
+            .expect("Failed to get user credentials");
+
+        poem_openapi::payload::Json(credentials)
+    }
+
+    /// Delete a user's credential
+    #[oai(path = "/auth/credentials/:credential_id", method = "delete", tag = "ApiTags::Auth")]
+    async fn delete_user_credential(
+        &self,
+        credential_id: Path<String>,
+        user_id: poem_openapi::param::Query<String>,
+    ) -> poem_openapi::payload::Json<serde_json::Value> {
+        let user_uuid = Uuid::parse_str(&user_id.0)
+            .expect("Invalid user ID format");
+        let credential_uuid = Uuid::parse_str(&credential_id.0)
+            .expect("Invalid credential ID format");
+
+        let success = self.state.webauthn.delete_user_credential(
+            &self.state.db.pool, 
+            user_uuid, 
+            credential_uuid
+        ).await.expect("Failed to delete credential");
+
+        poem_openapi::payload::Json(serde_json::json!({ "success": success }))
     }
 } 

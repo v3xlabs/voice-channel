@@ -12,6 +12,7 @@ pub struct Channel {
     pub name: String,
     pub description: Option<String>,
     pub instance_fqdn: String,
+    pub group_id: Uuid,
     pub max_participants: i32,
     pub current_participants: i32,
     pub created_at: DateTime<Utc>,
@@ -22,6 +23,7 @@ pub struct Channel {
 pub struct CreateChannelRequest {
     pub name: String,
     pub description: Option<String>,
+    pub group_id: Uuid,
     pub max_participants: Option<i32>,
 }
 
@@ -34,14 +36,15 @@ impl Channel {
         let channel = sqlx::query_as!(
             Channel,
             r#"
-            INSERT INTO channels (id, name, description, instance_fqdn, max_participants, current_participants)
-            VALUES ($1, $2, $3, $4, $5, 0)
+            INSERT INTO channels (id, name, description, instance_fqdn, group_id, max_participants, current_participants)
+            VALUES ($1, $2, $3, $4, $5, $6, 0)
             RETURNING *
             "#,
             Uuid::new_v4(),
             request.name,
             request.description,
             instance_fqdn,
+            request.group_id,
             request.max_participants.unwrap_or(50)
         )
         .fetch_one(pool)
@@ -58,6 +61,14 @@ impl Channel {
         Ok(channels)
     }
 
+    pub async fn find_by_name_and_group(pool: &PgPool, name: &str, group_id: Uuid) -> Result<Option<Self>, AppError> {
+        let channel = sqlx::query_as!(Channel, "SELECT * FROM channels WHERE name = $1 AND group_id = $2", name, group_id)
+            .fetch_optional(pool)
+            .await?;
+
+        Ok(channel)
+    }
+
     pub async fn find_by_name(pool: &PgPool, name: &str) -> Result<Option<Self>, AppError> {
         let channel = sqlx::query_as!(Channel, "SELECT * FROM channels WHERE name = $1", name)
             .fetch_optional(pool)
@@ -72,5 +83,13 @@ impl Channel {
             .await?;
 
         Ok(channel)
+    }
+
+    pub async fn find_by_group(pool: &PgPool, group_id: Uuid) -> Result<Vec<Self>, AppError> {
+        let channels = sqlx::query_as!(Channel, "SELECT * FROM channels WHERE group_id = $1 ORDER BY created_at DESC", group_id)
+            .fetch_all(pool)
+            .await?;
+
+        Ok(channels)
     }
 } 

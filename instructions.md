@@ -76,13 +76,14 @@ Users can access channels on any federated instance through URL routing:
 
 #### URL Format
 ```
-https://voice.channel/{target-instance-fqdn}#{channel-name}
+https://voice.channel/{target-instance-fqdn}/{group-name}/{channel-name}
 ```
 
 #### Examples
-- Local channel: `https://voice.channel/#general`
-- Remote channel: `https://voice.channel/v3x.vc#gaming`
-- Another remote: `https://voice.channel/company.example.com#meetings`
+- Local admin channel: `https://voice.channel/general` (admin group)
+- Local group channel: `https://voice.channel/mygroup/discussion`
+- Remote channel: `https://voice.channel/v3x.vc/gaming/general`
+- Another remote: `https://voice.channel/company.example.com/meetings/standup`
 
 #### Behavior
 1. **Frontend Routing**: The `voice.channel` frontend detects the target instance from the URL
@@ -260,15 +261,21 @@ Each server process keeps track of the channels its hosting, and an instance can
 A url for a voice channel at an instance would be something like:
 
 ```
-https://voice.channel/
+https://voice.channel/v3x.vc/gaming/irc
 ```
 
-Where `voice.channel` is the domain of any instance (in this case the globally hosted instance) and `v3x.vc` is the FQDN of the instance hosting the channel. `irc` is the channel name.
+Where `voice.channel` is the domain of any instance (in this case the globally hosted instance), `v3x.vc` is the FQDN of the instance hosting the channel, `gaming` is the group name, and `irc` is the channel name.
 
 When referring to a channel on the current instance, it is possible to use the following url:
 
 ```
-http://voice.channel/#irc
+https://voice.channel/gaming/irc
+```
+
+For channels in the special "admin" group, the group name can be omitted:
+
+```
+https://voice.channel/general
 ```
 
 ## User Experience Design
@@ -278,7 +285,7 @@ http://voice.channel/#irc
 The system distinguishes between two important concepts:
 
 1. **Channel Membership** - Subscribing to a channel for text chat and notifications
-   - Shows the channel in your sidebar as `#channelname`
+   - Shows the channel in your sidebar as `#groupname/channelname` or `#channelname` for admin group
    - Allows reading and sending text messages
    - Persists across sessions
    - Does NOT automatically put you in voice calls
@@ -312,6 +319,24 @@ The system distinguishes between two important concepts:
 - Audio/video controls (mute, camera, etc.)
 - "Leave Call" button in header
 - Real-time participant indicators
+
+### Admin Panel
+
+Accessible at `/admin` for users with admin permissions:
+- Instance settings management
+- User management and permissions
+- Group management
+- Channel management
+- Invitation system
+- Federation settings
+
+### Settings Panel
+
+Accessible at `/settings` for all users:
+- Personal profile settings
+- Notification preferences
+- Logout functionality
+- Admin panel link (for admins)
 
 ## Implementation Priorities
 
@@ -356,10 +381,22 @@ The system distinguishes between two important concepts:
 An instance is a server (potentially multiple) that are hosted on a single domain.
 An instance is identified by its FQDN. For example `voice.channel` is the FQDN of the globally hosted instance. Other examples of instances are `v3x.vc` and `example.com`.
 
+### Group
+
+Groups can be created by users provided they have the permissions to do so.
+Admin's are by default a member of the `admin` group and can create channels under this group.
+
+Group IDs should be `[a-zA-Z0-9-]+` and should be unique across the current instance.
+
 ### Channel
 
 A channel is a text chat channel that has an optional "room" voice call that can be joined at any time by any member of the channel.
 Its kind of like a discord text & voice channel in one.
+
+All voice channels belong to a group.
+Groups can be used to distinguish between channels with the same name on the same instance.
+
+For example `mygroup` can have a `hello` channel and `mygroupB` can also have a `hello` channel.
 
 #### Creating a channel
 
@@ -396,3 +433,23 @@ Prioritize channels that have active room's sorted by participant count.
 Then sort the rest of the channels by the last message sent timestamp, prioritizing unread messages.
 
 Keep track of what messages have been read by keeping track of the "last_read_message_id" for each channel for each user on the user's instance.
+
+#### Channel URL
+
+```sh
+# User is on voice.channel, but connected to v3x.vc, `mygroup/irc`
+https://voice.channel/v3x.vc/mygroup/irc
+
+# User is on voice.channel, connected to voice.channel, `mygroup/irc`
+https://voice.channel/mygroup/irc
+
+# User is on voice.channel, connected to voice.channel, `rss` of group `admin`
+https://voice.channel/rss
+```
+
+### Reserved URLs
+
+The following URLs are reserved for the web application:
+
+- `/settings` - User settings panel (includes logout, profile settings, admin link for admins)
+- `/admin` - Admin panel (only accessible to users with admin permissions)

@@ -5,4 +5,6 @@ pub mod user;
 pub mod membership;
 pub mod instance_settings;
 pub mod invitation;
-pub mod webauthn; 
+pub mod webauthn;
+pub mod group;
+pub mod user_permissions; 

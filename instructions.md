@@ -375,9 +375,24 @@ Joining a channel can be done from any instance, however subscription to the cha
 
 So if the user is currently on `voice.channel` and they join a channel on `v3x.vc` their subscription will be stored by the `voice.channel` database, however the users requests will be sent directly to `v3x.vc` instead. This means the user can lookup their "subscriptions" from their default instance, and the frontend will connect to the appropriate instance for each channel.
 
+Depending on the channel the user can join immediately or they will need a direct invite from someone. If a channel is public someone should be able to visit the url and click join to become a member. Otherwise it should show a message that an invite is required.
+
 #### Joining a room
 
 Joining a room is the terminology for once a user has joined a channel they can join the room.
 The room is the voice call that is associated with this channel.
 From the user perspective the room and channel are the same thing.
 The term "room" should not be used in the frontend visible to the user to avoid confusion.
+
+#### Channel Discovery
+
+As an extra but completely optional feature in the frontend sidebar is the "discover" tab.
+This tab allows users to see the channels available on the current instance.
+
+#### Channel Sorting
+
+On the sidebar in the frontend we should sort the channels the user is a member of;
+Prioritize channels that have active room's sorted by participant count.
+Then sort the rest of the channels by the last message sent timestamp, prioritizing unread messages.
+
+Keep track of what messages have been read by keeping track of the "last_read_message_id" for each channel for each user on the user's instance.

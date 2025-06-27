@@ -1,0 +1,61 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE user_permissions \n            SET can_create_groups = COALESCE($3, can_create_groups),\n                can_create_channels_global = COALESCE($4, can_create_channels_global)\n            WHERE user_id = $1 AND instance_fqdn = $2\n            RETURNING permission_id, user_id, instance_fqdn, can_create_groups, can_create_channels_global, created_at, updated_at\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "permission_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "user_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "instance_fqdn",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "can_create_groups",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 4,
+        "name": "can_create_channels_global",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 5,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 6,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Bool",
+        "Bool"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "afaf287797009f4aff6e608ddaea749c2f6351eec0f788054fd7e73789ff8789"
+}

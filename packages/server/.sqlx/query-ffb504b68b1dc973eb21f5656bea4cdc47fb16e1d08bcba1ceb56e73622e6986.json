@@ -1,11 +1,11 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT * FROM channels ORDER BY created_at DESC",
+  "query": "\n            INSERT INTO channels (name, description, instance_fqdn, group_id, max_participants, current_participants)\n            VALUES ($1, $2, $3, $4, $5, 0)\n            RETURNING channel_id, name, description, instance_fqdn, group_id, max_participants, current_participants, created_at, updated_at\n            ",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "id",
+        "name": "channel_id",
         "type_info": "Uuid"
       },
       {
@@ -25,27 +25,38 @@
       },
       {
         "ordinal": 4,
+        "name": "group_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 5,
         "name": "max_participants",
         "type_info": "Int4"
       },
       {
-        "ordinal": 5,
+        "ordinal": 6,
         "name": "current_participants",
         "type_info": "Int4"
       },
       {
-        "ordinal": 6,
+        "ordinal": 7,
         "name": "created_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 7,
+        "ordinal": 8,
         "name": "updated_at",
         "type_info": "Timestamptz"
       }
     ],
     "parameters": {
-      "Left": []
+      "Left": [
+        "Varchar",
+        "Text",
+        "Varchar",
+        "Uuid",
+        "Int4"
+      ]
     },
     "nullable": [
       false,
@@ -55,8 +66,9 @@
       false,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "523a2064b47fe5db3436647f119a6d8e95e6f44cb3762ffc58ffca102cf38976"
+  "hash": "ffb504b68b1dc973eb21f5656bea4cdc47fb16e1d08bcba1ceb56e73622e6986"
 }

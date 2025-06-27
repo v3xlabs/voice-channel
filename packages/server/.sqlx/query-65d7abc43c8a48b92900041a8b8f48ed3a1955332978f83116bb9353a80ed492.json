@@ -1,11 +1,11 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT EXISTS(SELECT 1 FROM invitation_uses WHERE invitation_id = $1 AND used_by = $2)",
+  "query": "SELECT is_admin FROM group_memberships WHERE group_id = $1 AND user_id = $2",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "exists",
+        "name": "is_admin",
         "type_info": "Bool"
       }
     ],
@@ -16,8 +16,8 @@
       ]
     },
     "nullable": [
-      null
+      false
     ]
   },
-  "hash": "050740cad7756f96f3d728f8976a40d832109a2850d1ccf10f389573e88822d9"
+  "hash": "65d7abc43c8a48b92900041a8b8f48ed3a1955332978f83116bb9353a80ed492"
 }

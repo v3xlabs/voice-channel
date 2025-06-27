@@ -1,6 +1,8 @@
 use poem_openapi::{param::Path, payload::Json, OpenApi, Tags};
 use std::sync::Arc;
 use uuid::Uuid;
+use chrono::Utc;
+use poem::StatusCode;
 
 use crate::{
     models::{
@@ -9,9 +11,9 @@ use crate::{
             RtpCapabilities, TransportInfo, CreateTransportRequest, ConnectTransportRequest,
             ProduceRequest, ProduceResponse, ConsumeRequest, ConsumeResponse,
         },
-        participant::{JoinChannelRequest, Participant, ParticipantUpdate},
+        participant::{JoinChannelRequest as JoinVoiceChannelRequest, Participant, ParticipantUpdate},
         user::{User, CreateUserRequest, UpdateUserRequest, UserAuthResponse},
-        membership::{ChannelMembership, ChannelWithMembership, JoinChannelMembershipRequest},
+        membership::{ChannelMembership, ChannelMembershipWithChannel, JoinChannelRequest as JoinChannelMembershipRequest},
         instance_settings::InstanceSettings,
         invitation::Invitation,
         webauthn::{
@@ -108,20 +110,20 @@ impl Api {
             .expect("User not found");
 
         // Ensure mediasoup room exists
-        self.state.mediasoup.get_or_create_room(channel.id).await
+        self.state.mediasoup.get_or_create_room(channel.channel_id).await
             .expect("Failed to create mediasoup room");
 
         // Create participant using user's display name
         let peer_id = Uuid::new_v4().to_string();
         let participant = Participant::new(
-            channel.id,
+            channel.channel_id,
             request.user_id.clone(),
             peer_id,
             user.display_name,
         );
 
         // Add participant to service
-        self.state.participants.add_participant(channel.id, participant.clone());
+        self.state.participants.add_participant(channel.channel_id, participant.clone());
 
         poem_openapi::payload::Json(participant)
     }
@@ -138,10 +140,10 @@ impl Api {
             .expect("Channel not found");
 
         // Ensure room exists
-        self.state.mediasoup.get_or_create_room(channel.id).await
+        self.state.mediasoup.get_or_create_room(channel.channel_id).await
             .expect("Failed to get or create room");
 
-        let capabilities = self.state.mediasoup.get_router_rtp_capabilities(channel.id)
+        let capabilities = self.state.mediasoup.get_router_rtp_capabilities(channel.channel_id)
             .expect("Failed to get RTP capabilities");
         
         poem_openapi::payload::Json(capabilities)
@@ -160,7 +162,7 @@ impl Api {
             .expect("Channel not found");
 
         let transport_info = self.state.mediasoup.create_webrtc_transport(
-            channel.id,
+            channel.channel_id,
             request.producing,
             request.consuming,
         ).await.expect("Failed to create WebRTC transport");
@@ -229,7 +231,7 @@ impl Api {
             .expect("Failed to query channel")
             .expect("Channel not found");
 
-        let participants = self.state.participants.get_channel_participants(channel.id);
+        let participants = self.state.participants.get_channel_participants(channel.channel_id);
         poem_openapi::payload::Json(participants)
     }
 
@@ -272,10 +274,10 @@ impl Api {
         &self,
         request: Json<CreateUserRequest>,
     ) -> poem_openapi::payload::Json<UserAuthResponse> {
-        let result = User::create(&self.state.db.pool, request.0).await
-            .expect("Failed to create user");
+        let result = User::create(&self.state.db.pool, request.0, self.state.config.instance_fqdn.clone()).await
+            .map_err(|e| poem::Error::from_string(e.to_string(), StatusCode::INTERNAL_SERVER_ERROR))?;
 
-        poem_openapi::payload::Json(result)
+        Ok(Json(result))
     }
 
     /// Update user profile

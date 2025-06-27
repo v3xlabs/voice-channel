@@ -386,7 +386,10 @@ An instance is identified by its FQDN. For example `voice.channel` is the FQDN o
 Groups can be created by users provided they have the permissions to do so.
 Admin's are by default a member of the `admin` group and can create channels under this group.
 
-Group IDs should be `[a-zA-Z0-9-]+` and should be unique across the current instance.
+Group IDs should be `([a-z0-9]-?[a-z0-9])+` and should be unique across the current instance.
+
+Regex: `([a-z0-9]-?[a-z0-9])+`
+Examples: `my-group`, `mygroup`, `v3x`, `rss`, `irc`
 
 ### Channel
 
@@ -397,6 +400,8 @@ All voice channels belong to a group.
 Groups can be used to distinguish between channels with the same name on the same instance.
 
 For example `mygroup` can have a `hello` channel and `mygroupB` can also have a `hello` channel.
+
+When an admin is creating a channel they cannot name it `admin` or `settings` as this could cause url conflicts.
 
 #### Creating a channel
 

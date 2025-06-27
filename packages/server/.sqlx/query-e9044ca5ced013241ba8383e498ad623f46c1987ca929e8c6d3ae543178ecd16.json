@@ -1,11 +1,11 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT * FROM channels WHERE id = $1",
+  "query": "SELECT channel_id, name, description, instance_fqdn, group_id, max_participants, current_participants, created_at, updated_at FROM channels ORDER BY created_at DESC",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "id",
+        "name": "channel_id",
         "type_info": "Uuid"
       },
       {
@@ -25,29 +25,32 @@
       },
       {
         "ordinal": 4,
+        "name": "group_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 5,
         "name": "max_participants",
         "type_info": "Int4"
       },
       {
-        "ordinal": 5,
+        "ordinal": 6,
         "name": "current_participants",
         "type_info": "Int4"
       },
       {
-        "ordinal": 6,
+        "ordinal": 7,
         "name": "created_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 7,
+        "ordinal": 8,
         "name": "updated_at",
         "type_info": "Timestamptz"
       }
     ],
     "parameters": {
-      "Left": [
-        "Uuid"
-      ]
+      "Left": []
     },
     "nullable": [
       false,
@@ -57,8 +60,9 @@
       false,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "e9f8d85417fdc81bd2dbfe749c7da303738ef2b5b1bd2f4fc1a22947108d93a2"
+  "hash": "e9044ca5ced013241ba8383e498ad623f46c1987ca929e8c6d3ae543178ecd16"
 }

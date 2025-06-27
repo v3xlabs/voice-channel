@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE invitations SET is_active = false WHERE id = $1",
+  "query": "DELETE FROM users WHERE user_id = $1",
   "describe": {
     "columns": [],
     "parameters": {
@@ -10,5 +10,5 @@
     },
     "nullable": []
   },
-  "hash": "42c5097fbfaf9e3d2eb2f2dabd2342562fb843d9dee7f6d56a259f302b339d7e"
+  "hash": "dfa520877c017cd5808d02c24ef2d71938b68093974f335a4d89df91874fdaa2"
 }

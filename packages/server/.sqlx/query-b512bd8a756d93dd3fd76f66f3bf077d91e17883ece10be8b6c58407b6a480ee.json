@@ -1,11 +1,11 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT * FROM channels WHERE instance_fqdn = $1 AND name = $2",
+  "query": "SELECT channel_id, name, description, instance_fqdn, group_id, max_participants, current_participants, created_at, updated_at FROM channels WHERE channel_id = $1",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "id",
+        "name": "channel_id",
         "type_info": "Uuid"
       },
       {
@@ -25,29 +25,33 @@
       },
       {
         "ordinal": 4,
+        "name": "group_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 5,
         "name": "max_participants",
         "type_info": "Int4"
       },
       {
-        "ordinal": 5,
+        "ordinal": 6,
         "name": "current_participants",
         "type_info": "Int4"
       },
       {
-        "ordinal": 6,
+        "ordinal": 7,
         "name": "created_at",
         "type_info": "Timestamptz"
       },
       {
-        "ordinal": 7,
+        "ordinal": 8,
         "name": "updated_at",
         "type_info": "Timestamptz"
       }
     ],
     "parameters": {
       "Left": [
-        "Text",
-        "Text"
+        "Uuid"
       ]
     },
     "nullable": [
@@ -58,8 +62,9 @@
       false,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "b7bc5cb41ca6c2940fc92795920045003596353eb7503c2a2023592bc92d840b"
+  "hash": "b512bd8a756d93dd3fd76f66f3bf077d91e17883ece10be8b6c58407b6a480ee"
 }

@@ -16,6 +16,14 @@ export const Layout: FC<LayoutProps> = ({ children }) => {
     checkAuth();
   }, []);
 
+  // Expose refresh function globally for other components to use
+  useEffect(() => {
+    (window as any).refreshUserChannels = loadUserChannels;
+    return () => {
+      delete (window as any).refreshUserChannels;
+    };
+  }, []);
+
   const checkAuth = async () => {
     try {
       setIsLoading(true);

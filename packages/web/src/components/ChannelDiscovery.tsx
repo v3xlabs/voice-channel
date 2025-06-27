@@ -42,6 +42,11 @@ export const ChannelDiscovery: FC = () => {
     try {
       await authService.joinChannel(channel.instance_fqdn, channel.name);
       await loadUserChannels(); // Refresh joined channels
+      
+      // Also refresh the sidebar channels list
+      if ((window as any).refreshUserChannels) {
+        await (window as any).refreshUserChannels();
+      }
     } catch (error) {
       console.error('Failed to join channel:', error);
     }

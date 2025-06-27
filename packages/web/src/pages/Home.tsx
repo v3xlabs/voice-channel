@@ -125,12 +125,13 @@ export const Home: React.FC = () => {
       )}
 
       {/* Channels Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="space-y-6 block">
         {channels.map((channel) => (
           <Link
             key={channel.id}
-            to={`/${channel.name}`}
-            className="bg-gray-800 rounded-lg p-6 border border-gray-700 hover:border-primary-500 transition-colors group"
+            to="/$instanceFqdn/$channelName"
+            params={{ instanceFqdn: channel.instance_fqdn, channelName: channel.name }}
+            className="bg-gray-800 flex rounded-lg p-6 border border-gray-700 hover:border-primary-500 transition-colors group flex-col"
           >
             <div className="flex items-start justify-between mb-4">
               <h3 className="text-lg font-semibold group-hover:text-primary-400 transition-colors">
@@ -141,13 +142,13 @@ export const Home: React.FC = () => {
                 <span>{channel.current_participants}/{channel.max_participants}</span>
               </div>
             </div>
-            
+
             {channel.description && (
               <p className="text-gray-400 text-sm mb-4 line-clamp-2">
                 {channel.description}
               </p>
             )}
-            
+
             <div className="flex items-center justify-between text-xs text-gray-500">
               <div className="flex items-center">
                 <Clock className="w-3 h-3 mr-1" />

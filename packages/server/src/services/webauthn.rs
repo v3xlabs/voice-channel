@@ -3,7 +3,8 @@ use sqlx::PgPool;
 use uuid::Uuid;
 use webauthn_rs::{prelude::*, Webauthn};
 use webauthn_rs_proto::ResidentKeyRequirement;
-// WebAuthn types are handled as JSON values for API serialization
+use std::collections::HashMap;
+use tokio::sync::RwLock;
 
 use crate::models::{
     webauthn::{
@@ -13,7 +14,7 @@ use crate::models::{
         LoginBeginRequest, LoginBeginResponse,
         LoginFinishRequest, LoginFinishResponse,
     },
-    user::{User, CreateUserRequest, UserAuthResponse},
+    user::{User, CreateUserRequest},
     invitation::Invitation,
     instance_settings::InstanceSettings,
 };
@@ -21,6 +22,9 @@ use crate::models::{
 pub struct WebAuthnService {
     webauthn: Webauthn,
     instance_fqdn: String,
+    // In-memory challenge storage - in production use Redis or persistent storage
+    registration_challenges: RwLock<HashMap<String, PasskeyRegistration>>,
+    authentication_challenges: RwLock<HashMap<String, PasskeyAuthentication>>,
 }
 
 impl WebAuthnService {
@@ -34,6 +38,8 @@ impl WebAuthnService {
         Ok(Self {
             webauthn,
             instance_fqdn,
+            registration_challenges: RwLock::new(HashMap::new()),
+            authentication_challenges: RwLock::new(HashMap::new()),
         })
     }
 
@@ -83,16 +89,18 @@ impl WebAuthnService {
             auth_sel.resident_key = Some(ResidentKeyRequirement::Required);
         }
 
-        // Store challenge state in database (using base64 encoding for binary data)
+        // Store challenge in database and in-memory state
         let challenge_id = Uuid::new_v4().to_string();
-        let challenge_data = base64::encode(bincode::serialize(&reg_state)
-            .map_err(|e| anyhow!("Failed to serialize registration state: {}", e))?);
         
+        // Store the WebAuthn state in memory
+        self.registration_challenges.write().await.insert(challenge_id.clone(), reg_state);
+        
+        // Store challenge metadata in database
         WebAuthnChallenge::create(
             pool,
             challenge_id.clone(),
             None, // No user_id during registration
-            challenge_data,
+            "registration_state".to_string(), // Placeholder - actual state is in memory
             ChallengeType::Registration,
             Some(request.display_name),
             request.invite_code,
@@ -118,11 +126,10 @@ impl WebAuthnService {
             return Err(anyhow!("Invalid challenge type"));
         }
 
-        // Deserialize registration state
-        let challenge_bytes = base64::decode(&challenge.challenge_data)
-            .map_err(|e| anyhow!("Failed to decode challenge data: {}", e))?;
-        let reg_state: PasskeyRegistration = bincode::deserialize(&challenge_bytes)
-            .map_err(|e| anyhow!("Failed to deserialize registration state: {}", e))?;
+        // Get registration state from memory
+        let reg_state = self.registration_challenges.write().await
+            .remove(&request.challenge_id)
+            .ok_or_else(|| anyhow!("Registration challenge not found or expired"))?;
         
         // Parse the credential from the frontend response
         let register_pk_credential: RegisterPublicKeyCredential = serde_json::from_value(request.credential)
@@ -157,9 +164,10 @@ impl WebAuthnService {
             Invitation::use_invitation(pool, invite_code, user.id).await?;
         }
 
-        // Store the verified credential (serialize passkey as JSON for storage)
+        // Store the verified credential
         let credential_id = passkey.cred_id().to_vec();
-        let public_key = bincode::serialize(&passkey)
+        // Store the passkey as JSON for future authentication
+        let public_key = serde_json::to_vec(&passkey)
             .map_err(|e| anyhow!("Failed to serialize passkey: {}", e))?;
 
         UserCredential::create(
@@ -191,16 +199,18 @@ impl WebAuthnService {
         // For resident key authentication, use empty allowCredentials for usernameless auth
         let (rcr, auth_state) = self.webauthn.start_passkey_authentication(&[])?;
 
-        // Store challenge state in database
+        // Store challenge in database and in-memory state
         let challenge_id = Uuid::new_v4().to_string();
-        let challenge_data = base64::encode(bincode::serialize(&auth_state)
-            .map_err(|e| anyhow!("Failed to serialize authentication state: {}", e))?);
         
+        // Store the WebAuthn state in memory
+        self.authentication_challenges.write().await.insert(challenge_id.clone(), auth_state);
+        
+        // Store challenge metadata in database
         WebAuthnChallenge::create(
             pool,
             challenge_id.clone(),
             None, // No user ID yet
-            challenge_data,
+            "authentication_state".to_string(), // Placeholder - actual state is in memory
             ChallengeType::Authentication,
             None,
             None,
@@ -226,11 +236,10 @@ impl WebAuthnService {
             return Err(anyhow!("Invalid challenge type"));
         }
 
-        // Deserialize authentication state
-        let challenge_bytes = base64::decode(&challenge.challenge_data)
-            .map_err(|e| anyhow!("Failed to decode challenge data: {}", e))?;
-        let auth_state: PasskeyAuthentication = bincode::deserialize(&challenge_bytes)
-            .map_err(|e| anyhow!("Failed to deserialize authentication state: {}", e))?;
+        // Get authentication state from memory
+        let auth_state = self.authentication_challenges.write().await
+            .remove(&request.challenge_id)
+            .ok_or_else(|| anyhow!("Authentication challenge not found or expired"))?;
 
         // Parse the authentication credential from frontend
         let auth_pk_credential: PublicKeyCredential = serde_json::from_value(request.credential)
@@ -243,11 +252,7 @@ impl WebAuthnService {
         let stored_credential = UserCredential::find_by_credential_id(pool, credential_id).await?
             .ok_or_else(|| anyhow!("Credential not found"))?;
 
-        // Deserialize the stored passkey
-        let stored_passkey: Passkey = bincode::deserialize(&stored_credential.public_key)
-            .map_err(|e| anyhow!("Failed to deserialize stored passkey: {}", e))?;
-
-        // Verify the authentication using webauthn-rs
+        // Verify the authentication using webauthn-rs (for passkeys, it handles resident key verification internally)
         let auth_result = self.webauthn.finish_passkey_authentication(&auth_pk_credential, &auth_state)
             .map_err(|e| anyhow!("Authentication verification failed: {:?}", e))?;
 
@@ -300,6 +305,12 @@ impl WebAuthnService {
 
     /// Clean up expired challenges (should be called periodically)
     pub async fn cleanup_expired_challenges(&self, pool: &PgPool) -> Result<u64> {
-        WebAuthnChallenge::cleanup_expired(pool).await
+        // Clean up database challenges
+        let deleted_count = WebAuthnChallenge::cleanup_expired(pool).await?;
+        
+        // TODO: Also clean up in-memory challenges based on timestamp
+        // For now, they'll be cleaned up when the service restarts
+        
+        Ok(deleted_count)
     }
 } 

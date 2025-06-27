@@ -121,15 +121,21 @@ impl WebAuthnService {
             return Err(anyhow!("Invalid challenge type"));
         }
 
-        // For now, create a dummy registration completion
-        // In production, this would deserialize the stored registration state
-        // let reg_state: PasskeyRegistration = serde_json::from_str(&challenge.challenge_data)?;
-        
-        // TODO: Implement proper WebAuthn credential verification
-        // For now, we'll create a mock passkey for development
+        // Extract credential ID from the WebAuthn credential response
+        let credential_id = request.credential
+            .get("id")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("Missing credential ID in response"))?;
+
+        // For development, we'll store basic credential data
+        // In production, this would properly verify the attestation and extract public key
         use base64::Engine;
-        let dummy_cred_id = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode("dummy_credential_id");
-        let dummy_public_key = vec![1, 2, 3, 4]; // This would be the actual public key in production
+        let credential_id_bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .decode(credential_id)
+            .map_err(|_| anyhow!("Invalid credential ID format"))?;
+        
+        // Store a placeholder public key (in production, extract from attestation)
+        let public_key = vec![1, 2, 3, 4]; // TODO: Extract actual public key from credential.response.publicKey
 
         // Validate invite again if needed (double-check)
         if let Some(invite_code) = &challenge.invite_code {
@@ -139,8 +145,6 @@ impl WebAuthnService {
             if !invitation.is_valid() {
                 return Err(anyhow!("Invite code expired or exhausted"));
             }
-
-            // We'll use the invitation after creating the user
         }
 
         // Create user account
@@ -158,12 +162,12 @@ impl WebAuthnService {
             Invitation::use_invitation(pool, invite_code, user.id).await?;
         }
 
-        // Store the credential
+        // Store the actual credential with real credential ID
         UserCredential::create(
             pool,
             user.id,
-            dummy_cred_id.as_bytes().to_vec(),
-            dummy_public_key,
+            credential_id_bytes,
+            public_key,
             0,
             Some(format!("{}'s Passkey", display_name)),
         ).await?;
@@ -171,7 +175,7 @@ impl WebAuthnService {
         // Clean up challenge
         WebAuthnChallenge::delete(pool, &request.challenge_id).await?;
 
-        tracing::info!("Successfully registered user {} with passkey", user.username);
+        tracing::info!("Successfully registered user {} with passkey (cred: {})", user.username, credential_id);
 
         Ok(RegisterFinishResponse {
             user,
@@ -223,18 +227,23 @@ impl WebAuthnService {
             return Err(anyhow!("Invalid challenge type"));
         }
 
-        // TODO: Implement proper WebAuthn authentication verification
-        // For now, simulate a successful authentication
+        // Extract credential ID from the WebAuthn authentication response
+        let credential_id = request.credential
+            .get("id")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("Missing credential ID in authentication response"))?;
+
+        use base64::Engine;
+        let credential_id_bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .decode(credential_id)
+            .map_err(|_| anyhow!("Invalid credential ID format"))?;
         
-        // Get credential from request (this would be properly parsed in production)
-        let credential_id = b"dummy_credential_id"; // This would come from the actual credential
-        
-        // Find the stored credential
-        let stored_credential = UserCredential::find_by_credential_id(pool, credential_id).await?
+        // Find the stored credential using the real credential ID
+        let stored_credential = UserCredential::find_by_credential_id(pool, &credential_id_bytes).await?
             .ok_or_else(|| anyhow!("Credential not found"))?;
 
         // In production, we would verify the authentication signature here
-        // For now, we'll just update the counter
+        // For now, we'll just update the counter (successful auth)
         UserCredential::update_counter(
             pool,
             &stored_credential.credential_id,
@@ -248,7 +257,7 @@ impl WebAuthnService {
         // Clean up challenge
         WebAuthnChallenge::delete(pool, &request.challenge_id).await?;
 
-        tracing::info!("Successfully authenticated user {}", user.username);
+        tracing::info!("Successfully authenticated user {} with credential {}", user.username, credential_id);
 
         Ok(LoginFinishResponse { user })
     }

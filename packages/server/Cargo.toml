@@ -44,7 +44,7 @@ async-trait = "0.1"
 dashmap = "5.5"
 
 # WebAuthn and Authentication
-webauthn-rs = { version = "0.5", features = ["resident-key-support"] }
+webauthn-rs = { version = "0.5", features = ["resident-key-support", "conditional-ui"] }
 webauthn-rs-proto = "0.5"
 base64 = "0.22"
 

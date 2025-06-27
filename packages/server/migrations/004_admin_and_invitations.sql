@@ -149,7 +149,8 @@ BEGIN
     WHERE instance_fqdn = NEW.instance_fqdn;
     
     -- If this is the first user, make them admin
-    IF user_count = 1 THEN
+    -- Note: COUNT is 0 because this trigger runs BEFORE INSERT
+    IF user_count = 0 THEN
         NEW.is_admin := true;
         
         -- Ensure instance settings exist

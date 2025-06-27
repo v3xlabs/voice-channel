@@ -1,0 +1,77 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE instance_settings \n            SET registration_mode = COALESCE($2, registration_mode),\n                invite_permission = COALESCE($3, invite_permission),\n                invite_limit = CASE WHEN $4::boolean THEN $5 ELSE invite_limit END,\n                instance_name = COALESCE($6, instance_name),\n                instance_description = CASE WHEN $7::boolean THEN $8 ELSE instance_description END,\n                updated_at = NOW()\n            WHERE instance_fqdn = $1\n            RETURNING id, instance_fqdn, registration_mode, invite_permission, \n                      invite_limit, instance_name, instance_description, \n                      created_at, updated_at\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "instance_fqdn",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "registration_mode",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "invite_permission",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "invite_limit",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 5,
+        "name": "instance_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "instance_description",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 7,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 8,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Varchar",
+        "Varchar",
+        "Bool",
+        "Int4",
+        "Varchar",
+        "Bool",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "7b7b1e6f622c74c6841d742f42fec8b44b91c98addf2fda5f7c52fb69dbd386d"
+}

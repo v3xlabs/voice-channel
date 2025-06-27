@@ -1,0 +1,82 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT id, instance_fqdn, invite_code, invited_by, invited_email, \n                   max_uses, current_uses, expires_at, is_active, created_at, used_at\n            FROM invitations \n            WHERE invite_code = $1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "instance_fqdn",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "invite_code",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "invited_by",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "invited_email",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "max_uses",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 6,
+        "name": "current_uses",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 7,
+        "name": "expires_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 8,
+        "name": "is_active",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 9,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 10,
+        "name": "used_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "28d98389e50736ecde125b0be5b016a85b853c85ad96d45a122705927cff8675"
+}

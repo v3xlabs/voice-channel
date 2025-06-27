@@ -12,6 +12,8 @@ use crate::{
         participant::{JoinChannelRequest, Participant, ParticipantUpdate},
         user::{User, CreateUserRequest, UpdateUserRequest, UserAuthResponse},
         membership::{ChannelMembership, ChannelWithMembership, JoinChannelMembershipRequest},
+        instance_settings::InstanceSettings,
+        invitation::Invitation,
     },
     AppState,
 };
@@ -28,6 +30,8 @@ enum ApiTags {
     WebRTC,
     /// User authentication and management
     Auth,
+    /// Instance administration
+    Admin,
 }
 
 #[OpenApi]
@@ -352,5 +356,58 @@ impl Api {
         ).await.expect("Failed to get channel members");
 
         poem_openapi::payload::Json(members)
+    }
+
+    // Admin Endpoints
+
+    /// Get instance settings
+    #[oai(path = "/admin/settings", method = "get", tag = "ApiTags::Admin")]
+    async fn get_instance_settings(
+        &self,
+    ) -> poem_openapi::payload::Json<InstanceSettings> {
+        let settings = InstanceSettings::get_or_create_default(&self.state.db.pool, &self.state.config.instance_fqdn)
+            .await
+            .expect("Failed to get instance settings");
+
+        poem_openapi::payload::Json(settings)
+    }
+
+    /// Check if registration is open
+    #[oai(path = "/admin/registration-status", method = "get", tag = "ApiTags::Admin")]
+    async fn get_registration_status(
+        &self,
+    ) -> poem_openapi::payload::Json<serde_json::Value> {
+        let settings = InstanceSettings::get_or_create_default(&self.state.db.pool, &self.state.config.instance_fqdn)
+            .await
+            .expect("Failed to get instance settings");
+
+        poem_openapi::payload::Json(serde_json::json!({
+            "registration_open": settings.is_registration_open(),
+            "registration_mode": settings.registration_mode,
+            "invite_permission": settings.invite_permission,
+            "instance_name": settings.instance_name
+        }))
+    }
+
+    /// Get invitation details by code (for registration page)
+    #[oai(path = "/invitations/:invite_code", method = "get", tag = "ApiTags::Admin")]
+    async fn get_invitation_by_code(
+        &self,
+        invite_code: Path<String>,
+    ) -> poem_openapi::payload::Json<Option<Invitation>> {
+        let invitation = Invitation::find_by_code(&self.state.db.pool, &invite_code)
+            .await
+            .expect("Failed to get invitation");
+
+        // Only return if invitation is valid
+        if let Some(inv) = invitation {
+            if inv.is_valid() {
+                poem_openapi::payload::Json(Some(inv))
+            } else {
+                poem_openapi::payload::Json(None)
+            }
+        } else {
+            poem_openapi::payload::Json(None)
+        }
     }
 } 

@@ -260,7 +260,7 @@ Each server process keeps track of the channels its hosting, and an instance can
 A url for a voice channel at an instance would be something like:
 
 ```
-http://voice.channel/v3x.vc#irc
+https://voice.channel/
 ```
 
 Where `voice.channel` is the domain of any instance (in this case the globally hosted instance) and `v3x.vc` is the FQDN of the instance hosting the channel. `irc` is the channel name.
@@ -349,3 +349,35 @@ The system distinguishes between two important concepts:
 - [ ] Security hardening
 - [ ] Performance optimization
 
+## Terminology
+
+### Instance
+
+An instance is a server (potentially multiple) that are hosted on a single domain.
+An instance is identified by its FQDN. For example `voice.channel` is the FQDN of the globally hosted instance. Other examples of instances are `v3x.vc` and `example.com`.
+
+### Channel
+
+A channel is a text chat channel that has an optional "room" voice call that can be joined at any time by any member of the channel.
+Its kind of like a discord text & voice channel in one.
+
+#### Creating a channel
+
+Channels can be created by anyone on an instance with the permissions to do so.
+Permissions for channel creation are defined on an instance level.
+By default only admins can create channels. However in the settings in the settings it can be adjusted instance wide as well as per user.
+
+#### Joining a channel
+
+Joining a channel is done by clicking the "Join" button on a channel.
+To be able to view a channel the user needs to be a member of the channel.
+Joining a channel can be done from any instance, however subscription to the channel is managed by the instance the user is currently on.
+
+So if the user is currently on `voice.channel` and they join a channel on `v3x.vc` their subscription will be stored by the `voice.channel` database, however the users requests will be sent directly to `v3x.vc` instead. This means the user can lookup their "subscriptions" from their default instance, and the frontend will connect to the appropriate instance for each channel.
+
+#### Joining a room
+
+Joining a room is the terminology for once a user has joined a channel they can join the room.
+The room is the voice call that is associated with this channel.
+From the user perspective the room and channel are the same thing.
+The term "room" should not be used in the frontend visible to the user to avoid confusion.

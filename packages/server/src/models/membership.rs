@@ -128,7 +128,7 @@ impl ChannelMembership {
             let channel = if is_local {
                 let channel_result = sqlx::query_as!(
                     Channel,
-                    "SELECT * FROM channels WHERE instance_fqdn = $1 AND name = $2",
+                    "SELECT id, name, description, instance_fqdn, group_id, max_participants, current_participants, created_at, updated_at FROM channels WHERE instance_fqdn = $1 AND name = $2",
                     row.channel_instance_fqdn,
                     row.channel_name
                 )

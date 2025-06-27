@@ -50,21 +50,21 @@ impl GroupsApi {
         &self,
         request: Json<CreateGroupRequest>,
         creator_id: poem_openapi::param::Query<String>,
-    ) -> Result<poem_openapi::payload::Json<Group>, poem_openapi::payload::PlainText<String>> {
+    ) -> Result<poem_openapi::payload::Json<Group>, poem::Error> {
         let creator_uuid = Uuid::parse_str(&creator_id.0)
-            .map_err(|_| poem_openapi::payload::PlainText("Invalid creator ID".to_string()))?;
+            .map_err(|_| poem::Error::from_string("Invalid creator ID".to_string(), poem::http::StatusCode::BAD_REQUEST))?;
 
         // Check if user can create groups
         let can_create = UserPermissions::can_create_groups(&self.state.db.pool, creator_uuid, &self.state.config.instance_fqdn).await
-            .map_err(|_| poem_openapi::payload::PlainText("Failed to check permissions".to_string()))?;
+            .map_err(|e| poem::Error::from_string(e.to_string(), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?;
 
         if !can_create {
-            return Err(poem_openapi::payload::PlainText("Permission denied".to_string()));
+            return Err(poem::Error::from_string("Permission denied".to_string(), poem::http::StatusCode::FORBIDDEN));
         }
 
         match Group::create(&self.state.db.pool, request.0, self.state.config.instance_fqdn.clone(), creator_uuid).await {
             Ok(group) => Ok(poem_openapi::payload::Json(group)),
-            Err(_) => Err(poem_openapi::payload::PlainText("Failed to create group".to_string())),
+            Err(e) => Err(poem::Error::from_string(e.to_string(), poem::http::StatusCode::INTERNAL_SERVER_ERROR)),
         }
     }
 
@@ -84,21 +84,21 @@ impl GroupsApi {
         group_id: Path<Uuid>,
         request: Json<UpdateGroupRequest>,
         user_id: poem_openapi::param::Query<String>,
-    ) -> Result<poem_openapi::payload::Json<Group>, poem_openapi::payload::PlainText<String>> {
+    ) -> Result<poem_openapi::payload::Json<Group>, poem::Error> {
         let user_uuid = Uuid::parse_str(&user_id.0)
-            .map_err(|_| poem_openapi::payload::PlainText("Invalid user ID".to_string()))?;
+            .map_err(|_| poem::Error::from_string("Invalid user ID".to_string(), poem::http::StatusCode::BAD_REQUEST))?;
 
         // Check if user is admin of the group
         let is_admin = GroupMembership::is_admin(&self.state.db.pool, *group_id, user_uuid).await
-            .map_err(|_| poem_openapi::payload::PlainText("Failed to check permissions".to_string()))?;
+            .map_err(|e| poem::Error::from_string(e.to_string(), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?;
 
         if !is_admin {
-            return Err(poem_openapi::payload::PlainText("Permission denied".to_string()));
+            return Err(poem::Error::from_string("Permission denied".to_string(), poem::http::StatusCode::FORBIDDEN));
         }
 
         match Group::update(&self.state.db.pool, *group_id, request.0).await {
             Ok(group) => Ok(poem_openapi::payload::Json(group)),
-            Err(_) => Err(poem_openapi::payload::PlainText("Failed to update group".to_string())),
+            Err(e) => Err(poem::Error::from_string(e.to_string(), poem::http::StatusCode::INTERNAL_SERVER_ERROR)),
         }
     }
 
@@ -108,7 +108,7 @@ impl GroupsApi {
         &self,
         group_id: Path<Uuid>,
         request: Json<JoinGroupRequest>,
-    ) -> Result<poem_openapi::payload::Json<GroupMembership>, poem_openapi::payload::PlainText<String>> {
+    ) -> Result<poem_openapi::payload::Json<GroupMembership>, poem::Error> {
         // Check if user can join the group
         let can_join = sqlx::query_scalar!(
             "SELECT can_user_join_group($1, $2)",
@@ -117,15 +117,15 @@ impl GroupsApi {
         )
         .fetch_one(&self.state.db.pool)
         .await
-        .map_err(|_| poem_openapi::payload::PlainText("Failed to check permissions".to_string()))?;
+        .map_err(|e| poem::Error::from_string(e.to_string(), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?;
 
         if !can_join.unwrap_or(false) {
-            return Err(poem_openapi::payload::PlainText("Cannot join this group".to_string()));
+            return Err(poem::Error::from_string("Cannot join this group".to_string(), poem::http::StatusCode::FORBIDDEN));
         }
 
         match GroupMembership::join_group(&self.state.db.pool, *group_id, request.user_id).await {
             Ok(membership) => Ok(poem_openapi::payload::Json(membership)),
-            Err(_) => Err(poem_openapi::payload::PlainText("Failed to join group".to_string())),
+            Err(e) => Err(poem::Error::from_string(e.to_string(), poem::http::StatusCode::INTERNAL_SERVER_ERROR)),
         }
     }
 
@@ -135,13 +135,13 @@ impl GroupsApi {
         &self,
         group_id: Path<Uuid>,
         user_id: poem_openapi::param::Query<String>,
-    ) -> Result<poem_openapi::payload::Json<serde_json::Value>, poem_openapi::payload::PlainText<String>> {
+    ) -> Result<poem_openapi::payload::Json<serde_json::Value>, poem::Error> {
         let user_uuid = Uuid::parse_str(&user_id.0)
-            .map_err(|_| poem_openapi::payload::PlainText("Invalid user ID".to_string()))?;
+            .map_err(|_| poem::Error::from_string("Invalid user ID".to_string(), poem::http::StatusCode::BAD_REQUEST))?;
 
         match GroupMembership::leave_group(&self.state.db.pool, *group_id, user_uuid).await {
             Ok(_) => Ok(poem_openapi::payload::Json(serde_json::json!({"success": true}))),
-            Err(_) => Err(poem_openapi::payload::PlainText("Failed to leave group".to_string())),
+            Err(e) => Err(poem::Error::from_string(e.to_string(), poem::http::StatusCode::INTERNAL_SERVER_ERROR)),
         }
     }
 
@@ -176,9 +176,9 @@ impl GroupsApi {
         group_id: Path<Uuid>,
         mut request: Json<CreateChannelRequest>,
         creator_id: poem_openapi::param::Query<String>,
-    ) -> Result<poem_openapi::payload::Json<Channel>, poem_openapi::payload::PlainText<String>> {
+    ) -> Result<poem_openapi::payload::Json<Channel>, poem::Error> {
         let creator_uuid = Uuid::parse_str(&creator_id.0)
-            .map_err(|_| poem_openapi::payload::PlainText("Invalid creator ID".to_string()))?;
+            .map_err(|_| poem::Error::from_string("Invalid creator ID".to_string(), poem::http::StatusCode::BAD_REQUEST))?;
 
         // Set the group_id in the request
         request.group_id = *group_id;
@@ -191,15 +191,15 @@ impl GroupsApi {
         )
         .fetch_one(&self.state.db.pool)
         .await
-        .map_err(|_| poem_openapi::payload::PlainText("Failed to check permissions".to_string()))?;
+        .map_err(|e| poem::Error::from_string(e.to_string(), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?;
 
         if !can_create.unwrap_or(false) {
-            return Err(poem_openapi::payload::PlainText("Permission denied".to_string()));
+            return Err(poem::Error::from_string("Permission denied".to_string(), poem::http::StatusCode::FORBIDDEN));
         }
 
         match Channel::create(&self.state.db.pool, request.0, self.state.config.instance_fqdn.clone()).await {
             Ok(channel) => Ok(poem_openapi::payload::Json(channel)),
-            Err(_) => Err(poem_openapi::payload::PlainText("Failed to create channel".to_string())),
+            Err(e) => Err(poem::Error::from_string(e.to_string(), poem::http::StatusCode::INTERNAL_SERVER_ERROR)),
         }
     }
 
@@ -236,27 +236,27 @@ impl GroupsApi {
         user_id: Path<Uuid>,
         request: Json<UpdateUserPermissionsRequest>,
         admin_id: poem_openapi::param::Query<String>,
-    ) -> Result<poem_openapi::payload::Json<UserPermissions>, poem_openapi::payload::PlainText<String>> {
+    ) -> Result<poem_openapi::payload::Json<UserPermissions>, poem::Error> {
         let admin_uuid = Uuid::parse_str(&admin_id.0)
-            .map_err(|_| poem_openapi::payload::PlainText("Invalid admin ID".to_string()))?;
+            .map_err(|_| poem::Error::from_string("Invalid admin ID".to_string(), poem::http::StatusCode::BAD_REQUEST))?;
 
         // Check if requester is admin
         let admin = User::find_by_id(&self.state.db.pool, admin_uuid).await
-            .map_err(|_| poem_openapi::payload::PlainText("Failed to find admin".to_string()))?;
+            .map_err(|e| poem::Error::from_string(e.to_string(), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?;
 
-        let admin = admin.ok_or_else(|| poem_openapi::payload::PlainText("Admin not found".to_string()))?;
+        let admin = admin.ok_or_else(|| poem::Error::from_string("Admin not found".to_string(), poem::http::StatusCode::NOT_FOUND))?;
 
         if !admin.is_admin || admin.instance_fqdn != self.state.config.instance_fqdn {
-            return Err(poem_openapi::payload::PlainText("Permission denied".to_string()));
+            return Err(poem::Error::from_string("Permission denied".to_string(), poem::http::StatusCode::FORBIDDEN));
         }
 
         // Ensure user permissions exist
         UserPermissions::create_or_get(&self.state.db.pool, *user_id, self.state.config.instance_fqdn.clone()).await
-            .map_err(|_| poem_openapi::payload::PlainText("Failed to create permissions".to_string()))?;
+            .map_err(|e| poem::Error::from_string(e.to_string(), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?;
 
         match UserPermissions::update(&self.state.db.pool, *user_id, &self.state.config.instance_fqdn, request.0).await {
             Ok(permissions) => Ok(poem_openapi::payload::Json(permissions)),
-            Err(_) => Err(poem_openapi::payload::PlainText("Failed to update permissions".to_string())),
+            Err(e) => Err(poem::Error::from_string(e.to_string(), poem::http::StatusCode::INTERNAL_SERVER_ERROR)),
         }
     }
 
@@ -265,23 +265,23 @@ impl GroupsApi {
     async fn list_users_with_permissions(
         &self,
         admin_id: poem_openapi::param::Query<String>,
-    ) -> Result<poem_openapi::payload::Json<Vec<(User, Option<UserPermissions>)>>, poem_openapi::payload::PlainText<String>> {
+    ) -> Result<poem_openapi::payload::Json<serde_json::Value>, poem::Error> {
         let admin_uuid = Uuid::parse_str(&admin_id.0)
-            .map_err(|_| poem_openapi::payload::PlainText("Invalid admin ID".to_string()))?;
+            .map_err(|_| poem::Error::from_string("Invalid admin ID".to_string(), poem::http::StatusCode::BAD_REQUEST))?;
 
         // Check if requester is admin
         let admin = User::find_by_id(&self.state.db.pool, admin_uuid).await
-            .map_err(|_| poem_openapi::payload::PlainText("Failed to find admin".to_string()))?;
+            .map_err(|e| poem::Error::from_string(e.to_string(), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?;
 
-        let admin = admin.ok_or_else(|| poem_openapi::payload::PlainText("Admin not found".to_string()))?;
+        let admin = admin.ok_or_else(|| poem::Error::from_string("Admin not found".to_string(), poem::http::StatusCode::NOT_FOUND))?;
 
         if !admin.is_admin || admin.instance_fqdn != self.state.config.instance_fqdn {
-            return Err(poem_openapi::payload::PlainText("Permission denied".to_string()));
+            return Err(poem::Error::from_string("Permission denied".to_string(), poem::http::StatusCode::FORBIDDEN));
         }
 
         match UserPermissions::list_users_with_permissions(&self.state.db.pool, &self.state.config.instance_fqdn).await {
-            Ok(users_permissions) => Ok(poem_openapi::payload::Json(users_permissions)),
-            Err(_) => Err(poem_openapi::payload::PlainText("Failed to list users".to_string())),
+            Ok(users_permissions) => Ok(poem_openapi::payload::Json(serde_json::to_value(users_permissions).unwrap())),
+            Err(e) => Err(poem::Error::from_string(e.to_string(), poem::http::StatusCode::INTERNAL_SERVER_ERROR)),
         }
     }
 } 

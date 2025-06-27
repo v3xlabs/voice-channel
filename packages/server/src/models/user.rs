@@ -1,13 +1,15 @@
 use chrono::{DateTime, Utc};
 use poem_openapi::Object;
 use serde::{Deserialize, Serialize};
-use sqlx::PgPool;
+use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
 use anyhow::Result;
 
-#[derive(Debug, Clone, Serialize, Deserialize, Object)]
+use crate::error::AppError;
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow, Object)]
 pub struct User {
-    pub id: Uuid,
+    pub user_id: Uuid,
     pub username: String,
     pub display_name: String,
     pub instance_fqdn: String,
@@ -18,13 +20,14 @@ pub struct User {
 
 #[derive(Debug, Deserialize, Object)]
 pub struct CreateUserRequest {
+    pub username: String,
     pub display_name: String,
-    pub instance_fqdn: String,
 }
 
 #[derive(Debug, Deserialize, Object)]
 pub struct UpdateUserRequest {
     pub display_name: Option<String>,
+    pub is_admin: Option<bool>,
 }
 
 #[derive(Debug, Serialize, Object)]
@@ -50,37 +53,26 @@ impl User {
     }
 
     /// Create a new user account
-    pub async fn create(pool: &PgPool, request: CreateUserRequest) -> Result<UserAuthResponse> {
-        let username = Self::generate_username(&request.display_name, &request.instance_fqdn);
-        
-        let user = sqlx::query!(
+    pub async fn create(
+        pool: &PgPool,
+        request: CreateUserRequest,
+        instance_fqdn: String,
+    ) -> Result<Self, AppError> {
+        let user = sqlx::query_as!(
+            User,
             r#"
-            INSERT INTO users (id, username, display_name, instance_fqdn)
-            VALUES ($1, $2, $3, $4)
-            RETURNING id, username, display_name, instance_fqdn, is_admin, created_at, updated_at
+            INSERT INTO users (username, display_name, instance_fqdn)
+            VALUES ($1, $2, $3)
+            RETURNING user_id, username, display_name, instance_fqdn, is_admin, created_at, updated_at
             "#,
-            Uuid::new_v4(),
-            username,
+            request.username,
             request.display_name,
-            request.instance_fqdn
+            instance_fqdn
         )
         .fetch_one(pool)
         .await?;
 
-        let user = User {
-            id: user.id,
-            username: user.username,
-            display_name: user.display_name,
-            instance_fqdn: user.instance_fqdn,
-            is_admin: user.is_admin,
-            created_at: user.created_at,
-            updated_at: user.updated_at,
-        };
-
-        Ok(UserAuthResponse {
-            user,
-            is_new: true,
-        })
+        Ok(user)
     }
 
     /// Create or get user by username (simplified auth)
@@ -95,78 +87,98 @@ impl User {
 
         // Create new user
         let request = CreateUserRequest {
+            username: username.to_string(),
             display_name: display_name.to_string(),
-            instance_fqdn: instance_fqdn.to_string(),
         };
         
-        Self::create(pool, request).await
+        Self::create(pool, request, instance_fqdn.to_string()).await?;
+        Self::find_by_username(pool, username, instance_fqdn).await
     }
 
     /// Find user by ID
-    pub async fn find_by_id(pool: &PgPool, id: Uuid) -> Result<Option<User>> {
-        let user = sqlx::query!(
-            "SELECT id, username, display_name, instance_fqdn, is_admin, created_at, updated_at FROM users WHERE id = $1",
-            id
+    pub async fn find_by_id(pool: &PgPool, user_id: Uuid) -> Result<Option<Self>, AppError> {
+        let user = sqlx::query_as!(
+            User,
+            "SELECT user_id, username, display_name, instance_fqdn, is_admin, created_at, updated_at FROM users WHERE user_id = $1",
+            user_id
         )
         .fetch_optional(pool)
         .await?;
 
-        Ok(user.map(|row| User {
-            id: row.id,
-            username: row.username,
-            display_name: row.display_name,
-            instance_fqdn: row.instance_fqdn,
-            is_admin: row.is_admin,
-            created_at: row.created_at,
-            updated_at: row.updated_at,
-        }))
+        Ok(user)
     }
 
     /// Find user by username and instance
-    pub async fn find_by_username(pool: &PgPool, username: &str, instance_fqdn: &str) -> Result<Option<User>> {
-        let user = sqlx::query!(
-            "SELECT id, username, display_name, instance_fqdn, is_admin, created_at, updated_at FROM users WHERE username = $1 AND instance_fqdn = $2",
+    pub async fn find_by_username(
+        pool: &PgPool,
+        username: &str,
+        instance_fqdn: &str,
+    ) -> Result<Option<Self>, AppError> {
+        let user = sqlx::query_as!(
+            User,
+            "SELECT user_id, username, display_name, instance_fqdn, is_admin, created_at, updated_at FROM users WHERE username = $1 AND instance_fqdn = $2",
             username,
             instance_fqdn
         )
         .fetch_optional(pool)
         .await?;
 
-        Ok(user.map(|row| User {
-            id: row.id,
-            username: row.username,
-            display_name: row.display_name,
-            instance_fqdn: row.instance_fqdn,
-            is_admin: row.is_admin,
-            created_at: row.created_at,
-            updated_at: row.updated_at,
-        }))
+        Ok(user)
     }
 
     /// Update user
-    pub async fn update(pool: &PgPool, id: Uuid, request: UpdateUserRequest) -> Result<User> {
-        let user = sqlx::query!(
+    pub async fn update(
+        pool: &PgPool,
+        user_id: Uuid,
+        request: UpdateUserRequest,
+    ) -> Result<Self, AppError> {
+        let user = sqlx::query_as!(
+            User,
             r#"
             UPDATE users 
             SET display_name = COALESCE($2, display_name),
-                updated_at = NOW()
-            WHERE id = $1
-            RETURNING id, username, display_name, instance_fqdn, is_admin, created_at, updated_at
+                is_admin = COALESCE($3, is_admin)
+            WHERE user_id = $1
+            RETURNING user_id, username, display_name, instance_fqdn, is_admin, created_at, updated_at
             "#,
-            id,
-            request.display_name
+            user_id,
+            request.display_name,
+            request.is_admin
         )
         .fetch_one(pool)
         .await?;
 
-        Ok(User {
-            id: user.id,
-            username: user.username,
-            display_name: user.display_name,
-            instance_fqdn: user.instance_fqdn,
-            is_admin: user.is_admin,
-            created_at: user.created_at,
-            updated_at: user.updated_at,
-        })
+        Ok(user)
+    }
+
+    pub async fn list_all(pool: &PgPool) -> Result<Vec<Self>, AppError> {
+        let users = sqlx::query_as!(
+            User,
+            "SELECT user_id, username, display_name, instance_fqdn, is_admin, created_at, updated_at FROM users ORDER BY created_at DESC"
+        )
+        .fetch_all(pool)
+        .await?;
+
+        Ok(users)
+    }
+
+    pub async fn list_by_instance(pool: &PgPool, instance_fqdn: &str) -> Result<Vec<Self>, AppError> {
+        let users = sqlx::query_as!(
+            User,
+            "SELECT user_id, username, display_name, instance_fqdn, is_admin, created_at, updated_at FROM users WHERE instance_fqdn = $1 ORDER BY created_at DESC",
+            instance_fqdn
+        )
+        .fetch_all(pool)
+        .await?;
+
+        Ok(users)
+    }
+
+    pub async fn delete(pool: &PgPool, user_id: Uuid) -> Result<bool, AppError> {
+        let result = sqlx::query!("DELETE FROM users WHERE user_id = $1", user_id)
+            .execute(pool)
+            .await?;
+
+        Ok(result.rows_affected() > 0)
     }
 } 

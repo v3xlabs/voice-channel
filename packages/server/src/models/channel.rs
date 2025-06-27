@@ -8,7 +8,7 @@ use crate::error::AppError;
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow, Object)]
 pub struct Channel {
-    pub id: Uuid,
+    pub channel_id: Uuid,
     pub name: String,
     pub description: Option<String>,
     pub instance_fqdn: String,
@@ -36,11 +36,10 @@ impl Channel {
         let channel = sqlx::query_as!(
             Channel,
             r#"
-            INSERT INTO channels (id, name, description, instance_fqdn, group_id, max_participants, current_participants)
-            VALUES ($1, $2, $3, $4, $5, $6, 0)
-            RETURNING *
+            INSERT INTO channels (name, description, instance_fqdn, group_id, max_participants, current_participants)
+            VALUES ($1, $2, $3, $4, $5, 0)
+            RETURNING channel_id, name, description, instance_fqdn, group_id, max_participants, current_participants, created_at, updated_at
             "#,
-            Uuid::new_v4(),
             request.name,
             request.description,
             instance_fqdn,
@@ -54,7 +53,7 @@ impl Channel {
     }
 
     pub async fn list_all(pool: &PgPool) -> Result<Vec<Self>, AppError> {
-        let channels = sqlx::query_as!(Channel, "SELECT * FROM channels ORDER BY created_at DESC")
+        let channels = sqlx::query_as!(Channel, "SELECT channel_id, name, description, instance_fqdn, group_id, max_participants, current_participants, created_at, updated_at FROM channels ORDER BY created_at DESC")
             .fetch_all(pool)
             .await?;
 
@@ -62,7 +61,7 @@ impl Channel {
     }
 
     pub async fn find_by_name_and_group(pool: &PgPool, name: &str, group_id: Uuid) -> Result<Option<Self>, AppError> {
-        let channel = sqlx::query_as!(Channel, "SELECT * FROM channels WHERE name = $1 AND group_id = $2", name, group_id)
+        let channel = sqlx::query_as!(Channel, "SELECT channel_id, name, description, instance_fqdn, group_id, max_participants, current_participants, created_at, updated_at FROM channels WHERE name = $1 AND group_id = $2", name, group_id)
             .fetch_optional(pool)
             .await?;
 
@@ -70,15 +69,15 @@ impl Channel {
     }
 
     pub async fn find_by_name(pool: &PgPool, name: &str) -> Result<Option<Self>, AppError> {
-        let channel = sqlx::query_as!(Channel, "SELECT * FROM channels WHERE name = $1", name)
+        let channel = sqlx::query_as!(Channel, "SELECT channel_id, name, description, instance_fqdn, group_id, max_participants, current_participants, created_at, updated_at FROM channels WHERE name = $1", name)
             .fetch_optional(pool)
             .await?;
 
         Ok(channel)
     }
 
-    pub async fn find_by_id(pool: &PgPool, id: Uuid) -> Result<Option<Self>, AppError> {
-        let channel = sqlx::query_as!(Channel, "SELECT * FROM channels WHERE id = $1", id)
+    pub async fn find_by_id(pool: &PgPool, channel_id: Uuid) -> Result<Option<Self>, AppError> {
+        let channel = sqlx::query_as!(Channel, "SELECT channel_id, name, description, instance_fqdn, group_id, max_participants, current_participants, created_at, updated_at FROM channels WHERE channel_id = $1", channel_id)
             .fetch_optional(pool)
             .await?;
 
@@ -86,7 +85,7 @@ impl Channel {
     }
 
     pub async fn find_by_group(pool: &PgPool, group_id: Uuid) -> Result<Vec<Self>, AppError> {
-        let channels = sqlx::query_as!(Channel, "SELECT * FROM channels WHERE group_id = $1 ORDER BY created_at DESC", group_id)
+        let channels = sqlx::query_as!(Channel, "SELECT channel_id, name, description, instance_fqdn, group_id, max_participants, current_participants, created_at, updated_at FROM channels WHERE group_id = $1 ORDER BY created_at DESC", group_id)
             .fetch_all(pool)
             .await?;
 

@@ -1,0 +1,4 @@
+prefer `user_id`, `post_id`, `channel_id`, etc over `id` for primary & foreign keys.
+avoid using uuids unless you have acquired explicit consent from the user.
+always create new migrations, dont edit existing ones that have been committed or after migrate has been run.
+run migrations using `cargo sqlx migrate run`

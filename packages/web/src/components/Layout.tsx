@@ -132,27 +132,41 @@ const ChannelItem: FC<ChannelItemProps> = ({ channelWithMembership, onLeave }) =
   
   const displayName = channel?.name || membership.channel_name;
   
-  // Build the channel URL
-  const channelUrl = is_local 
-    ? `/${membership.channel_name}`
-    : `/${membership.channel_instance_fqdn}/${membership.channel_name}`;
+  // Build the channel URL with group support
+  // TODO: Update when backend provides group information
+  const groupName = 'admin'; // Default to admin group for now
+  const isAdminGroup = groupName === 'admin';
+  
+  let channelUrl: string;
+  if (is_local) {
+    channelUrl = isAdminGroup ? `/${membership.channel_name}` : `/${groupName}/${membership.channel_name}`;
+  } else {
+    channelUrl = isAdminGroup 
+      ? `/${membership.channel_instance_fqdn}/${membership.channel_name}`
+      : `/${membership.channel_instance_fqdn}/${groupName}/${membership.channel_name}`;
+  }
+  
+  // Channel display name with group context
+  const fullDisplayName = isAdminGroup || is_local 
+    ? displayName 
+    : `${groupName}/${displayName}`;
   
   return (
     <div className="group flex items-center justify-between px-3 py-2 rounded hover:bg-gray-700">
-      <Link
-        to={channelUrl}
-        className="flex items-center space-x-2 flex-1 min-w-0 text-left"
+      <a
+        href={channelUrl}
+        className="flex items-center space-x-2 flex-1 min-w-0 text-left hover:text-blue-300 transition-colors"
       >
         <span className="text-gray-400">#</span>
-        <span className="text-sm text-white truncate hover:text-blue-300 transition-colors">
-          {displayName}
+        <span className="text-sm text-white truncate">
+          {fullDisplayName}
         </span>
         {!is_local && (
           <span className="text-xs text-blue-400 bg-blue-900 px-1 rounded">
             remote
           </span>
         )}
-      </Link>
+      </a>
       
       <button
         onClick={() => onLeave(membership.channel_instance_fqdn, membership.channel_name)}

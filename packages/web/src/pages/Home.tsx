@@ -1,8 +1,16 @@
 import { useState } from 'react'
-import { Link } from '@tanstack/react-router'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient, queryOptions } from '@tanstack/react-query'
 import { Plus, Users, Clock } from 'lucide-react'
-import { channelApi, type Channel, type CreateChannelRequest } from '../services/api'
+import { channelApi, type CreateChannelRequest } from '../services/api'
+
+const getPublicChannels = () => queryOptions({
+  queryKey: ['public_channels'],
+  async queryFn() {
+    const result = await channelApi.list();
+    return result;
+  },
+  staleTime: 30 * 1000, // 30 seconds
+});
 
 export const Home: React.FC = () => {
   const queryClient = useQueryClient()
@@ -14,16 +22,14 @@ export const Home: React.FC = () => {
   })
 
   // Fetch channels using TanStack Query
-  const { data: channels = [], isLoading } = useQuery({
-    queryKey: ['channels'],
-    queryFn: () => channelApi.list(),
-  })
+  const { data: channels = [], isLoading } = useQuery(getPublicChannels())
 
   // Create channel mutation
   const createChannelMutation = useMutation({
     mutationFn: (request: CreateChannelRequest) => channelApi.create(request),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['channels'] })
+      queryClient.invalidateQueries({ queryKey: ['public_channels'] })
+      queryClient.invalidateQueries({ queryKey: ['user_channels'] })
       setNewChannel({ name: '', description: '', max_participants: 50 })
       setShowCreateForm(false)
     },
@@ -126,40 +132,56 @@ export const Home: React.FC = () => {
 
       {/* Channels Grid */}
       <div className="space-y-6 block">
-        {channels.map((channel) => (
-          <Link
-            key={channel.id}
-            to="/$instanceFqdn/$channelName"
-            params={{ instanceFqdn: channel.instance_fqdn, channelName: channel.name }}
-            className="bg-gray-800 flex rounded-lg p-6 border border-gray-700 hover:border-primary-500 transition-colors group flex-col"
-          >
-            <div className="flex items-start justify-between mb-4">
-              <h3 className="text-lg font-semibold group-hover:text-primary-400 transition-colors">
-                {channel.name}
-              </h3>
-              <div className="flex items-center text-sm text-gray-400">
-                <Users className="w-4 h-4 mr-1" />
-                <span>{channel.current_participants}/{channel.max_participants}</span>
+        {channels.map((channel) => {
+          // Build the proper route - for now assume admin group until backend supports groups
+          // TODO: Update when backend returns group_name
+          const groupName = 'admin'; // Default to admin group for now
+          const isAdminGroup = groupName === 'admin';
+          const isLocalChannel = channel.instance_fqdn === window.location.hostname;
+          
+          let channelRoute: string;
+          if (isLocalChannel) {
+            channelRoute = isAdminGroup ? `/${channel.name}` : `/${groupName}/${channel.name}`;
+          } else {
+            channelRoute = isAdminGroup 
+              ? `/${channel.instance_fqdn}/${channel.name}` 
+              : `/${channel.instance_fqdn}/${groupName}/${channel.name}`;
+          }
+          
+          return (
+            <a
+              key={channel.id}
+              href={channelRoute}
+              className="bg-gray-800 flex rounded-lg p-6 border border-gray-700 hover:border-primary-500 transition-colors group flex-col"
+            >
+              <div className="flex items-start justify-between mb-4">
+                <h3 className="text-lg font-semibold group-hover:text-primary-400 transition-colors">
+                  {channel.name}
+                </h3>
+                <div className="flex items-center text-sm text-gray-400">
+                  <Users className="w-4 h-4 mr-1" />
+                  <span>{channel.current_participants}/{channel.max_participants}</span>
+                </div>
               </div>
-            </div>
 
-            {channel.description && (
-              <p className="text-gray-400 text-sm mb-4 line-clamp-2">
-                {channel.description}
-              </p>
-            )}
+              {channel.description && (
+                <p className="text-gray-400 text-sm mb-4 line-clamp-2">
+                  {channel.description}
+                </p>
+              )}
 
-            <div className="flex items-center justify-between text-xs text-gray-500">
-              <div className="flex items-center">
-                <Clock className="w-3 h-3 mr-1" />
-                <span>Created {formatDate(channel.created_at)}</span>
+              <div className="flex items-center justify-between text-xs text-gray-500">
+                <div className="flex items-center">
+                  <Clock className="w-3 h-3 mr-1" />
+                  <span>Created {formatDate(channel.created_at)}</span>
+                </div>
+                <span className="px-2 py-1 bg-gray-700 rounded text-xs">
+                  {channel.instance_fqdn}
+                </span>
               </div>
-              <span className="px-2 py-1 bg-gray-700 rounded text-xs">
-                {channel.instance_fqdn}
-              </span>
-            </div>
-          </Link>
-        ))}
+            </a>
+          );
+        })}
       </div>
 
       {channels.length === 0 && (

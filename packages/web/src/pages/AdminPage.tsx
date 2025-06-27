@@ -1,7 +1,6 @@
-import { FC, useEffect, useState } from 'react';
-import { Shield, Users, Settings, UserPlus, Layers, ArrowLeft } from 'lucide-react';
-import { authService, type InstanceSettings } from '../services/auth';
-import classnames from 'classnames';
+import { FC, useState } from 'react';
+import { Shield, Users, Settings, UserPlus, Layers } from 'lucide-react';
+import { useAdmin } from '../hooks/useAdmin';
 
 interface TabProps {
   id: string;
@@ -19,45 +18,20 @@ const tabs: TabProps[] = [
 
 export const AdminPage: FC = () => {
   const [activeTab, setActiveTab] = useState('overview');
-  const [settings, setSettings] = useState<InstanceSettings | null>(null);
-  const [registrationStatus, setRegistrationStatus] = useState<any>(null);
-  const [users, setUsers] = useState<any[]>([]);
-  const [groups, setGroups] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  
+  const {
+    instanceSettings,
+    registrationStatus,
+    users,
+    groups,
+    isLoading,
+    error,
+    isAdmin,
+    createInvitation,
+    isCreatingInvitation,
+  } = useAdmin();
 
-  useEffect(() => {
-    loadAdminData();
-  }, []);
-
-  const loadAdminData = async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      const [settingsData, statusData] = await Promise.all([
-        authService.getInstanceSettings(),
-        authService.getRegistrationStatus(),
-        // TODO: Add API calls for users and groups when endpoints are available
-        // fetch('/api/admin/users-permissions'),
-        // fetch('/api/groups'),
-      ]);
-
-      setSettings(settingsData);
-      setRegistrationStatus(statusData);
-      
-      // Mock data for now
-      setUsers([]);
-      setGroups([]);
-    } catch (error) {
-      console.error('Failed to load admin data:', error);
-      setError('Failed to load admin data. Make sure you have admin permissions.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  if (!authService.isAdmin()) {
+  if (!isAdmin) {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="text-center">
@@ -94,9 +68,9 @@ export const AdminPage: FC = () => {
             </svg>
           </div>
           <h2 className="text-xl font-semibold text-white mb-2">Error</h2>
-          <p className="text-gray-400 mb-4">{error}</p>
+          <p className="text-gray-400 mb-4">{error?.message || 'An error occurred'}</p>
           <button
-            onClick={loadAdminData}
+            onClick={() => window.location.reload()}
             className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
           >
             Retry
@@ -118,36 +92,36 @@ export const AdminPage: FC = () => {
         <div className="grid gap-6 md:grid-cols-2">
           <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
             <h2 className="text-xl font-semibold text-white mb-4">Instance Settings</h2>
-            {settings && (
+            {instanceSettings && (
               <div className="space-y-3">
                 <div>
                   <label className="text-sm font-medium text-gray-300">Instance Name</label>
-                  <p className="text-white">{settings.instance_name}</p>
+                  <p className="text-white">{instanceSettings.instance_name}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-gray-300">FQDN</label>
-                  <p className="text-white">{settings.instance_fqdn}</p>
+                  <p className="text-white">{instanceSettings.instance_fqdn}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-gray-300">Registration Mode</label>
                   <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
-                    settings.registration_mode === 'open' 
+                    instanceSettings.registration_mode === 'open' 
                       ? 'bg-green-900 text-green-200' 
                       : 'bg-yellow-900 text-yellow-200'
                   }`}>
-                    {settings.registration_mode}
+                    {instanceSettings.registration_mode}
                   </span>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-gray-300">Invitation Permission</label>
                   <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-900 text-blue-200">
-                    {settings.invite_permission}
+                    {instanceSettings.invite_permission}
                   </span>
                 </div>
-                {settings.instance_description && (
+                {instanceSettings.instance_description && (
                   <div>
                     <label className="text-sm font-medium text-gray-300">Description</label>
-                    <p className="text-white">{settings.instance_description}</p>
+                    <p className="text-white">{instanceSettings.instance_description}</p>
                   </div>
                 )}
               </div>

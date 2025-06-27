@@ -5,7 +5,7 @@ import type { paths } from '../types/api';
 type ExtendedPaths = paths & { [key: string]: any };
 
 export const apiFetch = createFetch<ExtendedPaths>({
-  baseUrl: 'http://localhost:3001/api/',  // Include /api in base URL
+  baseUrl: location.origin + '/api/',  // Include /api in base URL
   onError: (error: any) => {
     console.error('API Error:', error);
   },

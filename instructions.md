@@ -271,27 +271,79 @@ When referring to a channel on the current instance, it is possible to use the f
 http://voice.channel/#irc
 ```
 
+## User Experience Design
+
+### Channel Concepts
+
+The system distinguishes between two important concepts:
+
+1. **Channel Membership** - Subscribing to a channel for text chat and notifications
+   - Shows the channel in your sidebar as `#channelname`
+   - Allows reading and sending text messages
+   - Persists across sessions
+   - Does NOT automatically put you in voice calls
+
+2. **Voice Call Participation** - Actively joining the voice/video call in a channel
+   - Requires explicit "Join Call" action
+   - Shows video grid interface with participants
+   - Can be left without leaving the channel membership
+   - Temporary - ends when you leave the call
+
+### User Flow
+
+```
+1. Discover Channels → Join Channel → Channel appears in sidebar
+2. Click channel in sidebar → See text chat interface
+3. Click "Join Call" button → Enter voice/video call
+4. Click "Leave Call" button → Return to text chat (still member)
+```
+
+### Interface States
+
+#### Channel Page - Text Mode (Default)
+- Welcome message and channel description
+- Text message history (future implementation)
+- Message input field
+- Prominent "Join Call" button in header
+- Shows who is currently in voice call (if any)
+
+#### Channel Page - Voice Call Mode
+- Video grid with participant tiles
+- Audio/video controls (mute, camera, etc.)
+- "Leave Call" button in header
+- Real-time participant indicators
+
 ## Implementation Priorities
 
-### Phase 1: Single Instance
-- [ ] Basic WebRTC functionality
-- [ ] Channel management
-- [ ] User authentication
-- [ ] Mediasoup integration
+### Phase 1: Core Features ✅
+- [x] User authentication with passkey support
+- [x] Channel membership system
+- [x] Sidebar navigation with joined channels
+- [x] Text chat interface (UI ready)
+- [x] Explicit voice call joining/leaving
+- [x] WebRTC infrastructure (simulated)
+- [x] Admin system with invitations
 
-### Phase 2: Multi-Worker
+### Phase 2: Real-Time Features
+- [ ] Text chat implementation (WebSocket/SSE)
+- [ ] Real mediasoup integration
+- [ ] Message persistence and history
+- [ ] Typing indicators and presence
+- [ ] Push notifications for mentions
+
+### Phase 3: Multi-Worker Scaling
 - [ ] Worker authentication
 - [ ] Load balancing
 - [ ] Worker coordination
 - [ ] Horizontal scaling
 
-### Phase 3: Federation
+### Phase 4: Federation
 - [ ] Cross-instance API calls
 - [ ] Instance discovery
-- [ ] Frontend routing
+- [ ] Frontend routing for remote channels
 - [ ] Federation registry
 
-### Phase 4: Production
+### Phase 5: Production
 - [ ] Monitoring & metrics
 - [ ] Rate limiting
 - [ ] Security hardening

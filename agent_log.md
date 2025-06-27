@@ -14,6 +14,98 @@ Each log entry should include:
 
 ---
 
+## Entry 4: December 26, 2025 - Channel Flow & User Experience Improvements
+
+### Summary
+Implemented clear separation between channel membership and voice call participation, creating a much better user experience with explicit actions and proper terminology.
+
+### Key UX Improvements Made
+
+#### 1. **Clear Terminology & Concepts**
+- **Channel Membership** = Subscribing to a channel (shows in sidebar, text chat access)
+- **Voice Call Participation** = Actually joining voice/video call (explicit action)
+- Removed confusing auto-join behavior that immediately put users in voice calls
+
+#### 2. **Channel Page Interface**
+**Default State (Not in Call):**
+- Text chat interface with welcome message
+- Message input area (ready for future text chat implementation)
+- Prominent "Join Call" button in header
+- Helpful tip explaining how to join voice calls
+
+**In Voice Call State:**
+- Video grid interface with participants
+- "Leave Call" button and participant count
+- All existing WebRTC functionality preserved
+
+#### 3. **Sidebar Navigation**
+- ✅ Joined channels appear as clickable `#channelname` links
+- ✅ Real-time updates when joining new channels
+- ✅ Remote channels show instance indicators
+- ✅ Clean navigation between text and voice modes
+
+#### 4. **Channel Discovery Integration**
+- "Join Channel" button adds to user's subscriptions
+- "Joined" status for already-subscribed channels
+- Immediate sidebar refresh when joining channels
+- Global refresh function for cross-component updates
+
+### Technical Implementation
+
+#### Frontend Changes
+```typescript
+// Clear state management
+const [isInCall, setIsInCall] = useState(false);
+const [isJoiningCall, setIsJoiningCall] = useState(false);
+
+// Explicit call actions
+const handleJoinCall = async () => { /* explicit voice join */ };
+const handleLeaveCall = async () => { /* explicit voice leave */ };
+```
+
+#### Component Updates
+- **Channel.tsx**: Conditional rendering between text chat and video interface
+- **Layout.tsx**: Clickable sidebar channels with proper URL routing
+- **ChannelDiscovery.tsx**: Integrated membership system with sidebar refresh
+
+#### User Flow Architecture
+```
+1. Discover Channels → Join Channel → Channel in Sidebar
+2. Click Sidebar Channel → Text Chat Interface
+3. Click "Join Call" → Voice/Video Interface
+4. Click "Leave Call" → Back to Text Chat
+```
+
+### Current Status ✅
+- ✅ Clear separation of membership vs call participation
+- ✅ Text chat interface as default channel view
+- ✅ Explicit "Join Call" / "Leave Call" buttons
+- ✅ Sidebar navigation with joined channels
+- ✅ Real-time channel list updates
+- ✅ No more confusing auto-join behavior
+- ✅ Ready for text chat feature implementation
+
+### User Experience Validation
+- **Intuitive Flow**: Users understand the difference between joining a channel and joining a call
+- **Visual Clarity**: Clear states and transitions between text and voice modes
+- **Sidebar Integration**: Easy navigation between joined channels
+- **Explicit Actions**: No surprising auto-joins, everything is user-initiated
+
+### Future Development Ready
+- **Text Chat**: Interface is ready for message history and real-time chat
+- **Notifications**: Can add indicators for unread messages or active calls
+- **Channel Settings**: Easy to add per-channel configuration options
+- **Federation**: URL routing already supports cross-instance channels
+
+### Future Agent Notes - UX CRITICAL
+- **Never Auto-Join Calls**: Always require explicit user action for voice/video
+- **Preserve Text Chat**: Default channel view should always be text-based
+- **Sidebar is Navigation Hub**: All joined channels should be easily accessible
+- **Clear State Indicators**: Users should always know if they're in a call or text mode
+- **Channel Membership ≠ Call Participation**: These are completely separate concepts
+
+---
+
 ## Entry 3: December 26, 2025 - Federation & Multi-Worker Architecture Design
 
 ### Summary

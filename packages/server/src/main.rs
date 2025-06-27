@@ -69,7 +69,7 @@ async fn main() -> Result<()> {
     
     // Configure CORS
     let cors = Cors::new()
-        .allow_origin("http://localhost:3000")
+        .allow_origin_regex("*")
         .allow_methods(vec!["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"])
         .allow_headers(vec!["content-type", "authorization"]);
     

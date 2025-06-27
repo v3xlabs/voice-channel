@@ -1,9 +1,28 @@
 import { FC, useEffect, useState } from 'react';
+import { Shield, Users, Settings, UserPlus, Layers, ArrowLeft } from 'lucide-react';
 import { authService, type InstanceSettings } from '../services/auth';
+import classnames from 'classnames';
+
+interface TabProps {
+  id: string;
+  title: string;
+  icon: React.ComponentType<{ className?: string }>;
+}
+
+const tabs: TabProps[] = [
+  { id: 'overview', title: 'Overview', icon: Shield },
+  { id: 'users', title: 'Users & Permissions', icon: Users },
+  { id: 'groups', title: 'Groups', icon: Layers },
+  { id: 'instance', title: 'Instance Settings', icon: Settings },
+  { id: 'invitations', title: 'Invitations', icon: UserPlus },
+];
 
 export const AdminPage: FC = () => {
+  const [activeTab, setActiveTab] = useState('overview');
   const [settings, setSettings] = useState<InstanceSettings | null>(null);
   const [registrationStatus, setRegistrationStatus] = useState<any>(null);
+  const [users, setUsers] = useState<any[]>([]);
+  const [groups, setGroups] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -19,10 +38,17 @@ export const AdminPage: FC = () => {
       const [settingsData, statusData] = await Promise.all([
         authService.getInstanceSettings(),
         authService.getRegistrationStatus(),
+        // TODO: Add API calls for users and groups when endpoints are available
+        // fetch('/api/admin/users-permissions'),
+        // fetch('/api/groups'),
       ]);
 
       setSettings(settingsData);
       setRegistrationStatus(statusData);
+      
+      // Mock data for now
+      setUsers([]);
+      setGroups([]);
     } catch (error) {
       console.error('Failed to load admin data:', error);
       setError('Failed to load admin data. Make sure you have admin permissions.');

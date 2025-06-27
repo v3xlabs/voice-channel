@@ -1,16 +1,24 @@
 import { FC, useState } from 'react';
-import { authService } from '../services/auth';
+import { useAuth } from '../hooks/useAuth';
 
 interface LoginFormProps {
-  onLoginSuccess: () => void;
+  onLoginSuccess?: () => void;
 }
 
 export const LoginForm: FC<LoginFormProps> = ({ onLoginSuccess }) => {
+  const { 
+    createAccount, 
+    isCreatingAccount,
+    login, 
+    isLoggingIn
+  } = useAuth();
+  
   const [displayName, setDisplayName] = useState('');
   const [inviteCode, setInviteCode] = useState('');
   const [showInviteCode, setShowInviteCode] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const isLoading = isCreatingAccount || isLoggingIn;
 
   const handleCreateAccount = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,37 +28,44 @@ export const LoginForm: FC<LoginFormProps> = ({ onLoginSuccess }) => {
       return;
     }
 
-    setIsLoading(true);
     setError(null);
 
     try {
       const invite = inviteCode.trim() || undefined;
-      await authService.createAccount(displayName.trim(), invite);
-      onLoginSuccess();
+      createAccount(
+        { displayName: displayName.trim(), inviteCode: invite },
+        {
+          onSuccess: () => {
+            onLoginSuccess?.();
+          },
+          onError: (error) => {
+            console.error('Failed to create account:', error);
+            setError('Failed to create account. Please try again.');
+          }
+        }
+      );
     } catch (error) {
       console.error('Failed to create account:', error);
       setError('Failed to create account. Please try again.');
-    } finally {
-      setIsLoading(false);
     }
   };
 
   const handleLogin = async () => {
-    setIsLoading(true);
     setError(null);
 
     try {
-      const success = await authService.loginWithPasskey();
-      if (success) {
-        onLoginSuccess();
-      } else {
-        setError('Authentication failed. Please try again or create a new account.');
-      }
+      login(undefined, {
+        onSuccess: () => {
+          onLoginSuccess?.();
+        },
+        onError: (error) => {
+          console.error('Failed to login:', error);
+          setError('Authentication failed. This might happen if you don\'t have any passkeys registered on this device.');
+        }
+      });
     } catch (error) {
       console.error('Failed to login:', error);
-      setError('Authentication failed. This might happen if you don\'t have any passkeys registered on this device.');
-    } finally {
-      setIsLoading(false);
+      setError('Authentication failed. Please try again or create a new account.');
     }
   };
 

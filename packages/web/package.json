@@ -20,7 +20,9 @@
     "@radix-ui/react-label": "^2.1.7",
     "lucide-react": "^0.294.0",
     "openapi-hooks": "^0.0.6",
-    "mediasoup-client": "^3.7.4"
+    "mediasoup-client": "^3.7.4",
+    "@simplewebauthn/browser": "^9.0.0",
+    "classnames": "^2.3.2"
   },
   "devDependencies": {
     "@types/react": "^18.2.37",

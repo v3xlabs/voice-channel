@@ -6,7 +6,7 @@ use uuid::Uuid;
 use anyhow::Result;
 use webauthn_rs_proto::{
     CreationChallengeResponse, RegisterPublicKeyCredential, RequestChallengeResponse,
-    AuthenticationResponse, AuthenticatorAttachment,
+    AuthenticationExtensions,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -71,13 +71,13 @@ pub struct RegisterBeginRequest {
 #[derive(Debug, Serialize, Object)]
 pub struct RegisterBeginResponse {
     pub challenge_id: String,
-    pub options: CreationChallengeResponse,
+    pub options: serde_json::Value,
 }
 
 #[derive(Debug, Deserialize, Object)]
 pub struct RegisterFinishRequest {
     pub challenge_id: String,
-    pub credential: RegisterPublicKeyCredential,
+    pub credential: serde_json::Value,
 }
 
 #[derive(Debug, Serialize, Object)]
@@ -94,13 +94,13 @@ pub struct LoginBeginRequest {
 #[derive(Debug, Serialize, Object)]
 pub struct LoginBeginResponse {
     pub challenge_id: String,
-    pub options: RequestChallengeResponse,
+    pub options: serde_json::Value,
 }
 
 #[derive(Debug, Deserialize, Object)]
 pub struct LoginFinishRequest {
     pub challenge_id: String,
-    pub credential: AuthenticationResponse,
+    pub credential: serde_json::Value,
 }
 
 #[derive(Debug, Serialize, Object)]

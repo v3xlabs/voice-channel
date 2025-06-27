@@ -839,6 +839,238 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/register/begin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start WebAuthn registration */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json; charset=utf-8": components["schemas"]["RegisterBeginRequest"];
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["RegisterBeginResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/register/finish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Finish WebAuthn registration */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json; charset=utf-8": components["schemas"]["RegisterFinishRequest"];
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["RegisterFinishResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/login/begin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start WebAuthn authentication */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json; charset=utf-8": components["schemas"]["LoginBeginRequest"];
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["LoginBeginResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/login/finish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Finish WebAuthn authentication */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json; charset=utf-8": components["schemas"]["LoginFinishRequest"];
+                };
+            };
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["LoginFinishResponse"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/credentials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get user's credentials */
+        get: {
+            parameters: {
+                query: {
+                    user_id: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["CredentialInfo"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/credentials/{credential_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a user's credential */
+        delete: {
+            parameters: {
+                query: {
+                    user_id: string;
+                };
+                header?: never;
+                path: {
+                    credential_id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": unknown;
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -913,6 +1145,15 @@ export interface components {
             display_name: string;
             instance_fqdn: string;
         };
+        /** CredentialInfo */
+        CredentialInfo: {
+            id: string;
+            name?: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            last_used_at?: string;
+        };
         /** DtlsFingerprint */
         DtlsFingerprint: {
             algorithm: string;
@@ -986,7 +1227,24 @@ export interface components {
         /** JoinChannelRequest */
         JoinChannelRequest: {
             user_id: string;
-            display_name: string;
+        };
+        /** LoginBeginRequest */
+        LoginBeginRequest: {
+            username?: string;
+        };
+        /** LoginBeginResponse */
+        LoginBeginResponse: {
+            challenge_id: string;
+            options: unknown;
+        };
+        /** LoginFinishRequest */
+        LoginFinishRequest: {
+            challenge_id: string;
+            credential: unknown;
+        };
+        /** LoginFinishResponse */
+        LoginFinishResponse: {
+            user: components["schemas"]["User"];
         };
         /** Participant */
         Participant: {
@@ -1016,6 +1274,26 @@ export interface components {
         /** ProduceResponse */
         ProduceResponse: {
             producer_id: string;
+        };
+        /** RegisterBeginRequest */
+        RegisterBeginRequest: {
+            display_name: string;
+            invite_code?: string;
+        };
+        /** RegisterBeginResponse */
+        RegisterBeginResponse: {
+            challenge_id: string;
+            options: unknown;
+        };
+        /** RegisterFinishRequest */
+        RegisterFinishRequest: {
+            challenge_id: string;
+            credential: unknown;
+        };
+        /** RegisterFinishResponse */
+        RegisterFinishResponse: {
+            user: components["schemas"]["User"];
+            is_new: boolean;
         };
         /** RtpCapabilities */
         RtpCapabilities: {

@@ -7,6 +7,8 @@ interface LoginFormProps {
 
 export const LoginForm: FC<LoginFormProps> = ({ onLoginSuccess }) => {
   const [displayName, setDisplayName] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
+  const [showInviteCode, setShowInviteCode] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -22,7 +24,8 @@ export const LoginForm: FC<LoginFormProps> = ({ onLoginSuccess }) => {
     setError(null);
 
     try {
-      await authService.createAccount(displayName.trim());
+      const invite = inviteCode.trim() || undefined;
+      await authService.createAccount(displayName.trim(), invite);
       onLoginSuccess();
     } catch (error) {
       console.error('Failed to create account:', error);
@@ -129,6 +132,34 @@ export const LoginForm: FC<LoginFormProps> = ({ onLoginSuccess }) => {
                   disabled={isLoading}
                   autoFocus
                 />
+              </div>
+
+              {showInviteCode && (
+                <div>
+                  <label htmlFor="inviteCode" className="block text-sm font-medium text-gray-300 mb-2">
+                    Invite Code (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    id="inviteCode"
+                    value={inviteCode}
+                    onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+                    placeholder="Enter invite code"
+                    className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    disabled={isLoading}
+                    maxLength={8}
+                  />
+                </div>
+              )}
+
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={() => setShowInviteCode(!showInviteCode)}
+                  className="text-sm text-blue-400 hover:text-blue-300"
+                >
+                  {showInviteCode ? 'Hide invite code' : 'Have an invite code?'}
+                </button>
               </div>
 
               <button

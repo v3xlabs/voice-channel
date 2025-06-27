@@ -1,7 +1,6 @@
 import { apiFetch } from './api';
 import type { components } from '../types/api';
 import { startRegistration, startAuthentication } from '@simplewebauthn/browser';
-import type { PublicKeyCredentialCreationOptionsJSON, PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/browser';
 
 // Type definitions
 export type User = components['schemas']['User'];
@@ -15,7 +14,6 @@ export type InstanceSettings = components['schemas']['InstanceSettings'];
 export type Invitation = components['schemas']['Invitation'];
 
 const STORAGE_KEY = 'voice-channel-user';
-const PASSKEY_KEY = 'voice-channel-passkey';
 const INSTANCE_FQDN = 'localhost:3001'; // TODO: Get from environment
 
 export class AuthService {
@@ -59,61 +57,68 @@ export class AuthService {
     return this.currentUser !== null;
   }
 
-  // Generate a simple passkey (for demo - in production use WebAuthn)
-  private generatePasskey(): string {
-    return 'pk_' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-  }
-
-  // Create new account with passkey
-  async createAccount(displayName: string): Promise<UserAuthResponse> {
-    const request: CreateUserRequest = {
-      display_name: displayName,
-      instance_fqdn: INSTANCE_FQDN,
-    };
-
-    const response = await apiFetch('/auth/login', 'post', {
-      contentType: 'application/json; charset=utf-8',
-      data: request,
-    });
-
-    const authResponse = response.data as UserAuthResponse;
-    this.saveToStorage(authResponse.user);
-    
-    // Generate and store a simple passkey for future logins
-    const passkey = this.generatePasskey();
-    localStorage.setItem(PASSKEY_KEY, passkey);
-    
-    return authResponse;
-  }
-
-  // Login with stored passkey
-  async loginWithPasskey(): Promise<boolean> {
-    const storedPasskey = localStorage.getItem(PASSKEY_KEY);
-    if (!storedPasskey) {
-      return false;
-    }
-
+  // Create new account with WebAuthn passkey
+  async createAccount(displayName: string, inviteCode?: string): Promise<UserAuthResponse> {
     try {
-      // For now, just try to create a new session with empty display name
-      // In production, this would use WebAuthn to authenticate the passkey
-      const request: CreateUserRequest = {
-        display_name: '', // Will be ignored for existing users
-        instance_fqdn: INSTANCE_FQDN,
-      };
-
-      const response = await apiFetch('/auth/login', 'post', {
+      // Step 1: Start WebAuthn registration
+      const beginResponse = await apiFetch('/auth/register/begin', 'post', {
         contentType: 'application/json; charset=utf-8',
-        data: request,
+        data: {
+          display_name: displayName,
+          invite_code: inviteCode,
+        },
       });
 
-      const authResponse = response.data as UserAuthResponse;
+      // Step 2: Use WebAuthn browser API to create credential
+      const credential = await startRegistration(beginResponse.data.options as any);
+
+      // Step 3: Complete registration with server
+      const finishResponse = await apiFetch('/auth/register/finish', 'post', {
+        contentType: 'application/json; charset=utf-8',
+        data: {
+          challenge_id: beginResponse.data.challenge_id,
+          credential,
+        },
+      });
+
+      const authResponse = finishResponse.data as UserAuthResponse;
+      this.saveToStorage(authResponse.user);
+      
+      return authResponse;
+    } catch (error) {
+      console.error('WebAuthn registration failed:', error);
+      throw new Error('Failed to create account with passkey. Please try again.');
+    }
+  }
+
+  // Login with WebAuthn passkey
+  async loginWithPasskey(): Promise<boolean> {
+    try {
+      // Step 1: Start WebAuthn authentication
+      const beginResponse = await apiFetch('/auth/login/begin', 'post', {
+        contentType: 'application/json; charset=utf-8',
+        data: {},
+      });
+
+      // Step 2: Use WebAuthn browser API to authenticate
+      const credential = await startAuthentication(beginResponse.data.options as any);
+
+      // Step 3: Complete authentication with server
+      const finishResponse = await apiFetch('/auth/login/finish', 'post', {
+        contentType: 'application/json; charset=utf-8',
+        data: {
+          challenge_id: beginResponse.data.challenge_id,
+          credential,
+        },
+      });
+
+      const authResponse = finishResponse.data;
       this.saveToStorage(authResponse.user);
       
       return true;
     } catch (error) {
-      console.error('Failed to login with passkey:', error);
-      // Clear invalid passkey
-      localStorage.removeItem(PASSKEY_KEY);
+      console.error('WebAuthn authentication failed:', error);
+      // Clear stored user on authentication failure
       localStorage.removeItem(STORAGE_KEY);
       this.currentUser = null;
       return false;
@@ -193,13 +198,12 @@ export class AuthService {
   // Logout
   logout(): void {
     localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem(PASSKEY_KEY);
     this.currentUser = null;
   }
 
-  // Check if user has a stored passkey
+  // Check if user has WebAuthn credentials (based on stored user)
   hasStoredPasskey(): boolean {
-    return localStorage.getItem(PASSKEY_KEY) !== null;
+    return this.currentUser !== null;
   }
 
   // Check if current user is admin

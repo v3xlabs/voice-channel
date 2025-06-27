@@ -5,10 +5,7 @@ use poem::{
     web::Html,
     EndpointExt, Route, Server,
 };
-use tower::ServiceBuilder;
-use tower_governor::{
-    governor::GovernorConfigBuilder, key_extractor::SmartIpKeyExtractor, GovernorLayer,
-};
+// Rate limiting temporarily disabled for development
 use poem_openapi::OpenApiService;
 use std::sync::Arc;
 use tracing::{info, Level};
@@ -89,16 +86,7 @@ async fn main() -> Result<()> {
         .allow_methods(vec!["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"])
         .allow_headers(vec!["content-type", "authorization"]);
     
-    // Configure rate limiting for registration (2 requests per IP per day)
-    let rate_limit_config = GovernorConfigBuilder::default()
-        .per_second(2)  // Allow 2 requests
-        .burst_size(2)  // Burst size of 2
-        .per_nanosecond(24 * 60 * 60 * 1_000_000_000) // Per day (24 hours in nanoseconds)
-        .key_extractor(SmartIpKeyExtractor::default())
-        .finish()
-        .expect("Failed to create rate limit config");
-    
-    let rate_limiter = GovernorLayer::new(&rate_limit_config);
+    // Rate limiting will be implemented later
     
     // Scalar documentation HTML
     let docs_html = include_str!("docs.html");

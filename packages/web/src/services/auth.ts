@@ -70,7 +70,7 @@ export class AuthService {
       });
 
       // Step 2: Use WebAuthn browser API to create credential
-      const credential = await startRegistration(beginResponse.data.options as any);
+      const credential = await startRegistration((beginResponse.data.options as any).publicKey);
 
       // Step 3: Complete registration with server
       const finishResponse = await apiFetch('/auth/register/finish', 'post', {
@@ -101,7 +101,7 @@ export class AuthService {
       });
 
       // Step 2: Use WebAuthn browser API to authenticate
-      const credential = await startAuthentication(beginResponse.data.options as any);
+      const credential = await startAuthentication((beginResponse.data.options as any).publicKey);
 
       // Step 3: Complete authentication with server
       const finishResponse = await apiFetch('/auth/login/finish', 'post', {

@@ -57,7 +57,8 @@ async fn main() -> Result<()> {
     let participants = Arc::new(ParticipantService::new());
 
     // Initialize WebAuthn service
-    let webauthn_origin = format!("http://localhost:3001");
+    // Use frontend origin for WebAuthn (where the user actually interacts)
+    let webauthn_origin = format!("http://localhost:5173");
     let webauthn_rp_id = "localhost";
     let webauthn = Arc::new(WebAuthnService::new(
         &webauthn_origin,

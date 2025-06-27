@@ -35,31 +35,26 @@ export const LoginForm: FC<LoginFormProps> = ({ onLoginSuccess }) => {
     }
   };
 
-  const handleQuickLogin = async () => {
+  const handleLogin = async () => {
     setIsLoading(true);
     setError(null);
 
     try {
-      const hasPasskey = authService.hasStoredPasskey();
-      if (hasPasskey) {
-        const success = await authService.loginWithPasskey();
-        if (success) {
-          onLoginSuccess();
-        } else {
-          setError('Failed to authenticate with saved passkey. Please create a new account.');
-        }
+      const success = await authService.loginWithPasskey();
+      if (success) {
+        onLoginSuccess();
       } else {
-        setError('No saved account found. Please create a new account.');
+        setError('Authentication failed. Please try again or create a new account.');
       }
     } catch (error) {
       console.error('Failed to login:', error);
-      setError('Failed to login. Please try again.');
+      setError('Authentication failed. This might happen if you don\'t have any passkeys registered on this device.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const hasStoredAccount = authService.hasStoredPasskey();
+  const [showCreateAccount, setShowCreateAccount] = useState(false);
 
   return (
     <div className="min-h-screen bg-gray-900 flex items-center justify-center px-4">
@@ -75,15 +70,15 @@ export const LoginForm: FC<LoginFormProps> = ({ onLoginSuccess }) => {
         </div>
 
         <div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-          {hasStoredAccount ? (
+          {!showCreateAccount ? (
             <div className="space-y-4">
               <div className="text-center">
-                <h3 className="text-xl font-semibold text-white mb-2">Welcome back!</h3>
-                <p className="text-gray-400 mb-4">Sign in with your saved account</p>
+                <h3 className="text-xl font-semibold text-white mb-2">Welcome!</h3>
+                <p className="text-gray-400 mb-4">Sign in with your passkey or create a new account</p>
               </div>
               
               <button
-                onClick={handleQuickLogin}
+                onClick={handleLogin}
                 disabled={isLoading}
                 className="w-full flex items-center justify-center px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -99,17 +94,25 @@ export const LoginForm: FC<LoginFormProps> = ({ onLoginSuccess }) => {
                 )}
               </button>
 
-              <div className="text-center">
-                <button
-                  onClick={() => {
-                    authService.logout();
-                    window.location.reload();
-                  }}
-                  className="text-sm text-gray-400 hover:text-white"
-                >
-                  Create new account instead
-                </button>
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-600"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-gray-800 text-gray-400">or</span>
+                </div>
               </div>
+
+              <button
+                onClick={() => setShowCreateAccount(true)}
+                disabled={isLoading}
+                className="w-full flex items-center justify-center px-4 py-3 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                Create New Account
+              </button>
             </div>
           ) : (
             <form onSubmit={handleCreateAccount} className="space-y-4">
@@ -152,7 +155,7 @@ export const LoginForm: FC<LoginFormProps> = ({ onLoginSuccess }) => {
                 </div>
               )}
 
-              <div className="text-center">
+              <div className="text-center space-y-2">
                 <button
                   type="button"
                   onClick={() => setShowInviteCode(!showInviteCode)}
@@ -160,6 +163,15 @@ export const LoginForm: FC<LoginFormProps> = ({ onLoginSuccess }) => {
                 >
                   {showInviteCode ? 'Hide invite code' : 'Have an invite code?'}
                 </button>
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateAccount(false)}
+                    className="text-sm text-gray-400 hover:text-white"
+                  >
+                    ← Back to Sign In
+                  </button>
+                </div>
               </div>
 
               <button

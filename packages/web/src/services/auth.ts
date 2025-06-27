@@ -14,7 +14,6 @@ export type InstanceSettings = components['schemas']['InstanceSettings'];
 export type Invitation = components['schemas']['Invitation'];
 
 const STORAGE_KEY = 'voice-channel-user';
-const INSTANCE_FQDN = 'localhost:3001'; // TODO: Get from environment
 
 export class AuthService {
   private currentUser: User | null = null;
@@ -60,6 +59,8 @@ export class AuthService {
   // Create new account with WebAuthn passkey
   async createAccount(displayName: string, inviteCode?: string): Promise<UserAuthResponse> {
     try {
+      console.log('🆕 Starting WebAuthn registration for:', displayName);
+      
       // Step 1: Start WebAuthn registration
       const beginResponse = await apiFetch('/auth/register/begin', 'post', {
         contentType: 'application/json; charset=utf-8',
@@ -69,10 +70,21 @@ export class AuthService {
         },
       });
 
+      console.log('📡 Server register/begin response:', beginResponse.data);
+      
+      const publicKeyOptions = (beginResponse.data.options as any).publicKey;
+      console.log('🔑 WebAuthn publicKey options for registration:', JSON.stringify(publicKeyOptions, null, 2));
+      console.log('🆔 RP ID:', publicKeyOptions.rp.id);
+      console.log('👤 User info:', publicKeyOptions.user);
+      console.log('🌍 Origin (expected):', window.location.origin);
+
       // Step 2: Use WebAuthn browser API to create credential
-      const credential = await startRegistration((beginResponse.data.options as any).publicKey);
+      console.log('🔨 Creating WebAuthn credential...');
+      const credential = await startRegistration(publicKeyOptions);
+      console.log('✅ WebAuthn credential created:', credential);
 
       // Step 3: Complete registration with server
+      console.log('🏁 Finishing registration with server...');
       const finishResponse = await apiFetch('/auth/register/finish', 'post', {
         contentType: 'application/json; charset=utf-8',
         data: {
@@ -81,12 +93,14 @@ export class AuthService {
         },
       });
 
+      console.log('🎉 Registration successful:', finishResponse.data);
       const authResponse = finishResponse.data as UserAuthResponse;
       this.saveToStorage(authResponse.user);
       
       return authResponse;
     } catch (error) {
-      console.error('WebAuthn registration failed:', error);
+      console.error('❌ WebAuthn registration failed:', error);
+      console.error('❌ Registration error details:', JSON.stringify(error, null, 2));
       throw new Error('Failed to create account with passkey. Please try again.');
     }
   }
@@ -94,16 +108,29 @@ export class AuthService {
   // Login with WebAuthn passkey
   async loginWithPasskey(): Promise<boolean> {
     try {
+      console.log('🔐 Starting WebAuthn authentication...');
+      
       // Step 1: Start WebAuthn authentication
       const beginResponse = await apiFetch('/auth/login/begin', 'post', {
         contentType: 'application/json; charset=utf-8',
         data: {},
       });
 
+      console.log('📡 Server login/begin response:', beginResponse.data);
+      
+      const publicKeyOptions = (beginResponse.data.options as any).publicKey;
+      console.log('🔑 WebAuthn publicKey options:', JSON.stringify(publicKeyOptions, null, 2));
+      console.log('🆔 RP ID:', publicKeyOptions.rpId);
+      console.log('🌍 Origin (expected):', window.location.origin);
+      console.log('🔗 Allow credentials:', publicKeyOptions.allowCredentials);
+
       // Step 2: Use WebAuthn browser API to authenticate
-      const credential = await startAuthentication((beginResponse.data.options as any).publicKey);
+      console.log('🔍 Calling startAuthentication with options...');
+      const credential = await startAuthentication(publicKeyOptions);
+      console.log('✅ WebAuthn credential received:', credential);
 
       // Step 3: Complete authentication with server
+      console.log('🏁 Finishing authentication with server...');
       const finishResponse = await apiFetch('/auth/login/finish', 'post', {
         contentType: 'application/json; charset=utf-8',
         data: {
@@ -112,12 +139,21 @@ export class AuthService {
         },
       });
 
+      console.log('🎉 Authentication successful:', finishResponse.data);
       const authResponse = finishResponse.data;
       this.saveToStorage(authResponse.user);
       
       return true;
     } catch (error) {
-      console.error('WebAuthn authentication failed:', error);
+      console.error('❌ WebAuthn authentication failed:', error);
+      console.error('❌ Error details:', JSON.stringify(error, null, 2));
+      
+      // Check if it's a WebAuthn specific error
+      if (error && typeof error === 'object' && 'name' in error) {
+        console.error('❌ WebAuthn error name:', (error as any).name);
+        console.error('❌ WebAuthn error message:', (error as any).message);
+      }
+      
       // Clear stored user on authentication failure
       localStorage.removeItem(STORAGE_KEY);
       this.currentUser = null;

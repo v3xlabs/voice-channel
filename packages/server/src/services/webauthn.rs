@@ -2,6 +2,7 @@ use anyhow::{anyhow, Result};
 use sqlx::PgPool;
 use uuid::Uuid;
 use webauthn_rs::{prelude::*, Webauthn};
+use webauthn_rs_proto::ResidentKeyRequirement;
 // WebAuthn types are handled as JSON values for API serialization
 
 use crate::models::{
@@ -72,13 +73,19 @@ impl WebAuthnService {
         // Generate a unique ID for the challenge (not a user ID yet)
         let user_unique_id = Uuid::new_v4().to_string();
         
-        // Start WebAuthn registration
-        let (ccr, reg_state) = self.webauthn.start_passkey_registration(
+        // Start WebAuthn registration - passkey registration should create discoverable credentials
+        let (mut ccr, _reg_state) = self.webauthn.start_passkey_registration(
             Uuid::parse_str(&user_unique_id)?,
             &request.display_name,
             &request.display_name,
             None,
         )?;
+
+        // Manually override the authenticator selection to require resident keys
+        if let Some(ref mut auth_sel) = ccr.public_key.authenticator_selection {
+            auth_sel.require_resident_key = true;
+            auth_sel.resident_key = Some(ResidentKeyRequirement::Required);
+        }
 
         // Store challenge in database
         let challenge_id = Uuid::new_v4().to_string();
@@ -178,9 +185,9 @@ impl WebAuthnService {
         pool: &PgPool,
         _request: LoginBeginRequest,
     ) -> Result<LoginBeginResponse> {
-        // For passkey authentication, we don't need to specify user credentials upfront
-        // The authenticator will present available credentials
-        let (rcr, auth_state) = self.webauthn.start_passkey_authentication(&[])?;
+        // For resident key passkeys, we use empty allowCredentials for usernameless auth
+        // The resident key requirement ensures discoverability
+        let (rcr, _auth_state) = self.webauthn.start_passkey_authentication(&[])?;
 
         // Store challenge in database
         let challenge_id = Uuid::new_v4().to_string();

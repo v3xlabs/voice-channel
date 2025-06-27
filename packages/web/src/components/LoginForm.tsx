@@ -38,8 +38,13 @@ export const LoginForm: FC<LoginFormProps> = ({ onLoginSuccess }) => {
 
     try {
       const hasPasskey = authService.hasStoredPasskey();
-      if (hasPasskey && await authService.loginWithPasskey()) {
-        onLoginSuccess();
+      if (hasPasskey) {
+        const success = await authService.loginWithPasskey();
+        if (success) {
+          onLoginSuccess();
+        } else {
+          setError('Failed to authenticate with saved passkey. Please create a new account.');
+        }
       } else {
         setError('No saved account found. Please create a new account.');
       }

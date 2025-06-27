@@ -732,6 +732,113 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get instance settings */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["InstanceSettings"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/registration-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Check if registration is open */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": unknown;
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invitations/{invite_code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get invitation details by code (for registration page) */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    invite_code: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json; charset=utf-8": components["schemas"]["Invitation"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -803,8 +910,7 @@ export interface components {
         };
         /** CreateUserRequest */
         CreateUserRequest: {
-            username?: string;
-            display_name?: string;
+            display_name: string;
             instance_fqdn: string;
         };
         /** DtlsFingerprint */
@@ -832,6 +938,43 @@ export interface components {
         IceParameters: {
             username_fragment: string;
             password: string;
+        };
+        /** InstanceSettings */
+        InstanceSettings: {
+            /** Format: uuid */
+            id: string;
+            instance_fqdn: string;
+            registration_mode: string;
+            invite_permission: string;
+            /** Format: int32 */
+            invite_limit?: number;
+            instance_name: string;
+            instance_description?: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        /** Invitation */
+        Invitation: {
+            /** Format: uuid */
+            id: string;
+            instance_fqdn: string;
+            invite_code: string;
+            /** Format: uuid */
+            invited_by: string;
+            invited_email?: string;
+            /** Format: int32 */
+            max_uses: number;
+            /** Format: int32 */
+            current_uses: number;
+            /** Format: date-time */
+            expires_at?: string;
+            is_active: boolean;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            used_at?: string;
         };
         /** JoinChannelMembershipRequest */
         JoinChannelMembershipRequest: {
@@ -904,7 +1047,6 @@ export interface components {
         };
         /** UpdateUserRequest */
         UpdateUserRequest: {
-            username?: string;
             display_name?: string;
         };
         /** User */
@@ -914,7 +1056,7 @@ export interface components {
             username: string;
             display_name: string;
             instance_fqdn: string;
-            is_temporary: boolean;
+            is_admin: boolean;
             /** Format: date-time */
             created_at: string;
             /** Format: date-time */

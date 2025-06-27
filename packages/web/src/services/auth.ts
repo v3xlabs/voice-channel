@@ -9,6 +9,8 @@ export type UserAuthResponse = components['schemas']['UserAuthResponse'];
 export type ChannelWithMembership = components['schemas']['ChannelWithMembership'];
 export type ChannelMembership = components['schemas']['ChannelMembership'];
 export type JoinChannelMembershipRequest = components['schemas']['JoinChannelMembershipRequest'];
+export type InstanceSettings = components['schemas']['InstanceSettings'];
+export type Invitation = components['schemas']['Invitation'];
 
 const STORAGE_KEY = 'voice-channel-user';
 const PASSKEY_KEY = 'voice-channel-passkey';
@@ -62,12 +64,9 @@ export class AuthService {
 
   // Create new account with passkey
   async createAccount(displayName: string): Promise<UserAuthResponse> {
-    const passkey = this.generatePasskey();
-    
     const request: CreateUserRequest = {
       display_name: displayName,
       instance_fqdn: INSTANCE_FQDN,
-      passkey_credential: passkey,
     };
 
     const response = await apiFetch('/auth/login', 'post', {
@@ -78,22 +77,45 @@ export class AuthService {
     const authResponse = response.data as UserAuthResponse;
     this.saveToStorage(authResponse.user);
     
-    // Store passkey for future logins
+    // Generate and store a simple passkey for future logins
+    const passkey = this.generatePasskey();
     localStorage.setItem(PASSKEY_KEY, passkey);
     
     return authResponse;
   }
 
-  // Login with stored passkey (future: implement WebAuthn)
+  // Login with stored passkey
   async loginWithPasskey(): Promise<boolean> {
     const storedPasskey = localStorage.getItem(PASSKEY_KEY);
     if (!storedPasskey) {
       return false;
     }
 
-    // For now, just validate that we have a stored user
-    // In production, this would use WebAuthn to authenticate the passkey
-    return this.isLoggedIn();
+    try {
+      // For now, just try to create a new session with empty display name
+      // In production, this would use WebAuthn to authenticate the passkey
+      const request: CreateUserRequest = {
+        display_name: '', // Will be ignored for existing users
+        instance_fqdn: INSTANCE_FQDN,
+      };
+
+      const response = await apiFetch('/auth/login', 'post', {
+        contentType: 'application/json; charset=utf-8',
+        data: request,
+      });
+
+      const authResponse = response.data as UserAuthResponse;
+      this.saveToStorage(authResponse.user);
+      
+      return true;
+    } catch (error) {
+      console.error('Failed to login with passkey:', error);
+      // Clear invalid passkey
+      localStorage.removeItem(PASSKEY_KEY);
+      localStorage.removeItem(STORAGE_KEY);
+      this.currentUser = null;
+      return false;
+    }
   }
 
   // Update user profile
@@ -176,6 +198,36 @@ export class AuthService {
   // Check if user has a stored passkey
   hasStoredPasskey(): boolean {
     return localStorage.getItem(PASSKEY_KEY) !== null;
+  }
+
+  // Check if current user is admin
+  isAdmin(): boolean {
+    return this.currentUser?.is_admin === true;
+  }
+
+  // Admin: Get instance settings
+  async getInstanceSettings(): Promise<InstanceSettings> {
+    const response = await apiFetch('/admin/settings', 'get', {});
+    return response.data as InstanceSettings;
+  }
+
+  // Admin: Get registration status
+  async getRegistrationStatus(): Promise<any> {
+    const response = await apiFetch('/admin/registration-status', 'get', {});
+    return response.data;
+  }
+
+  // Get invitation by code (for registration)
+  async getInvitationByCode(code: string): Promise<Invitation | null> {
+    try {
+      const response = await apiFetch('/invitations/{invite_code}', 'get', {
+        path: { invite_code: code },
+      });
+      return response.data as Invitation;
+    } catch (error) {
+      console.error('Failed to get invitation:', error);
+      return null;
+    }
   }
 }
 

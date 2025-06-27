@@ -43,7 +43,7 @@ pub struct RegisterBeginRequest {
 #[derive(Debug, Serialize, Object)]
 pub struct RegisterBeginResponse {
     pub challenge_id: String,
-    pub publicKey: serde_json::Value,
+    pub options: serde_json::Value,
 }
 
 #[derive(Debug, Deserialize, Object)]
@@ -66,7 +66,7 @@ pub struct LoginBeginRequest {
 #[derive(Debug, Serialize, Object)]
 pub struct LoginBeginResponse {
     pub challenge_id: String,
-    pub publicKey: serde_json::Value,
+    pub options: serde_json::Value,
 }
 
 #[derive(Debug, Deserialize, Object)]

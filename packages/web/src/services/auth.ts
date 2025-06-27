@@ -72,9 +72,15 @@ export class AuthService {
 
       console.log('📡 Server register/begin response:', beginResponse.data);
       
-      const publicKeyOptions = (beginResponse.data.options as any).publicKey;
+      const publicKeyOptions = beginResponse.data.options as any;
       console.log('🔑 WebAuthn publicKey options for registration:', JSON.stringify(publicKeyOptions, null, 2));
-      console.log('🆔 RP ID:', publicKeyOptions.rp.id);
+      
+      // Check if we have a valid WebAuthn options object
+      if (!publicKeyOptions || Object.keys(publicKeyOptions).length === 0) {
+        throw new Error('Server returned empty WebAuthn options. WebAuthn service not properly implemented.');
+      }
+      
+      console.log('🆔 RP ID:', publicKeyOptions.rp?.id);
       console.log('👤 User info:', publicKeyOptions.user);
       console.log('🌍 Origin (expected):', window.location.origin);
 
@@ -118,8 +124,14 @@ export class AuthService {
 
       console.log('📡 Server login/begin response:', beginResponse.data);
       
-      const publicKeyOptions = (beginResponse.data.options as any).publicKey;
+      const publicKeyOptions = beginResponse.data.options as any;
       console.log('🔑 WebAuthn publicKey options:', JSON.stringify(publicKeyOptions, null, 2));
+      
+      // Check if we have a valid WebAuthn options object
+      if (!publicKeyOptions || Object.keys(publicKeyOptions).length === 0) {
+        throw new Error('Server returned empty WebAuthn options. WebAuthn service not properly implemented.');
+      }
+      
       console.log('🆔 RP ID:', publicKeyOptions.rpId);
       console.log('🌍 Origin (expected):', window.location.origin);
       console.log('🔗 Allow credentials:', publicKeyOptions.allowCredentials);

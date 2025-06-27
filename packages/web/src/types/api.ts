@@ -616,7 +616,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json; charset=utf-8": components["schemas"]["ChannelWithMembership"][];
+                        "application/json; charset=utf-8": components["schemas"]["ChannelMembershipWithChannel"][];
                     };
                 };
             };
@@ -663,7 +663,9 @@ export interface paths {
         /** Join a channel (become a member) */
         post: {
             parameters: {
-                query?: never;
+                query: {
+                    user_id: string;
+                };
                 header?: never;
                 path: {
                     channel_instance_fqdn: string;
@@ -671,11 +673,7 @@ export interface paths {
                 };
                 cookie?: never;
             };
-            requestBody: {
-                content: {
-                    "application/json; charset=utf-8": components["schemas"]["JoinChannelMembershipRequest"];
-                };
-            };
+            requestBody?: never;
             responses: {
                 200: {
                     headers: {
@@ -1078,10 +1076,12 @@ export interface components {
         /** Channel */
         Channel: {
             /** Format: uuid */
-            id: string;
+            channel_id: string;
             name: string;
             description?: string;
             instance_fqdn: string;
+            /** Format: uuid */
+            group_id: string;
             /** Format: int32 */
             max_participants: number;
             /** Format: int32 */
@@ -1094,7 +1094,7 @@ export interface components {
         /** ChannelMembership */
         ChannelMembership: {
             /** Format: uuid */
-            id: string;
+            membership_id: string;
             /** Format: uuid */
             user_id: string;
             channel_instance_fqdn: string;
@@ -1104,11 +1104,19 @@ export interface components {
             /** Format: date-time */
             last_active: string;
         };
-        /** ChannelWithMembership */
-        ChannelWithMembership: {
+        /** ChannelMembershipWithChannel */
+        ChannelMembershipWithChannel: {
+            /** Format: uuid */
+            membership_id: string;
+            /** Format: uuid */
+            user_id: string;
+            channel_instance_fqdn: string;
+            channel_name: string;
+            /** Format: date-time */
+            joined_at: string;
+            /** Format: date-time */
+            last_active: string;
             channel?: components["schemas"]["Channel"];
-            membership: components["schemas"]["ChannelMembership"];
-            is_local: boolean;
         };
         /** ConnectTransportRequest */
         ConnectTransportRequest: {
@@ -1132,6 +1140,8 @@ export interface components {
         CreateChannelRequest: {
             name: string;
             description?: string;
+            /** Format: uuid */
+            group_id: string;
             /** Format: int32 */
             max_participants?: number;
         };
@@ -1142,12 +1152,12 @@ export interface components {
         };
         /** CreateUserRequest */
         CreateUserRequest: {
-            display_name: string;
-            instance_fqdn: string;
+            username: string;
         };
         /** CredentialInfo */
         CredentialInfo: {
-            id: string;
+            /** Format: uuid */
+            credential_record_id: string;
             name?: string;
             /** Format: date-time */
             created_at: string;
@@ -1183,7 +1193,7 @@ export interface components {
         /** InstanceSettings */
         InstanceSettings: {
             /** Format: uuid */
-            id: string;
+            settings_id: string;
             instance_fqdn: string;
             registration_mode: string;
             invite_permission: string;
@@ -1199,30 +1209,27 @@ export interface components {
         /** Invitation */
         Invitation: {
             /** Format: uuid */
-            id: string;
-            instance_fqdn: string;
+            invitation_id: string;
             invite_code: string;
             /** Format: uuid */
-            invited_by: string;
+            created_by: string;
+            /** Format: uuid */
+            invited_by?: string;
             invited_email?: string;
+            instance_fqdn: string;
             /** Format: int32 */
-            max_uses: number;
+            max_uses?: number;
             /** Format: int32 */
             current_uses: number;
+            is_active: boolean;
             /** Format: date-time */
             expires_at?: string;
-            is_active: boolean;
+            /** Format: date-time */
+            used_at?: string;
             /** Format: date-time */
             created_at: string;
             /** Format: date-time */
-            used_at?: string;
-        };
-        /** JoinChannelMembershipRequest */
-        JoinChannelMembershipRequest: {
-            /** Format: uuid */
-            user_id: string;
-            channel_instance_fqdn: string;
-            channel_name: string;
+            updated_at: string;
         };
         /** JoinChannelRequest */
         JoinChannelRequest: {
@@ -1244,7 +1251,10 @@ export interface components {
         };
         /** LoginFinishResponse */
         LoginFinishResponse: {
-            user: components["schemas"]["User"];
+            /** Format: uuid */
+            user_id: string;
+            username: string;
+            success: boolean;
         };
         /** Participant */
         Participant: {
@@ -1292,8 +1302,9 @@ export interface components {
         };
         /** RegisterFinishResponse */
         RegisterFinishResponse: {
-            user: components["schemas"]["User"];
-            is_new: boolean;
+            /** Format: uuid */
+            user_id: string;
+            success: boolean;
         };
         /** RtpCapabilities */
         RtpCapabilities: {
@@ -1326,15 +1337,17 @@ export interface components {
         /** UpdateUserRequest */
         UpdateUserRequest: {
             display_name?: string;
+            is_admin?: boolean;
         };
         /** User */
         User: {
             /** Format: uuid */
-            id: string;
+            user_id: string;
             username: string;
             display_name: string;
             instance_fqdn: string;
             is_admin: boolean;
+            has_passkey: boolean;
             /** Format: date-time */
             created_at: string;
             /** Format: date-time */
@@ -1343,7 +1356,6 @@ export interface components {
         /** UserAuthResponse */
         UserAuthResponse: {
             user: components["schemas"]["User"];
-            is_new: boolean;
         };
     };
     responses: never;

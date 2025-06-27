@@ -196,8 +196,24 @@ impl WebAuthnService {
         pool: &PgPool,
         _request: LoginBeginRequest,
     ) -> Result<LoginBeginResponse> {
-        // For resident key authentication, use empty allowCredentials for usernameless auth
-        let (rcr, auth_state) = self.webauthn.start_passkey_authentication(&[])?;
+        // For resident key authentication, get all stored passkeys to enable authentication
+        // In a real discoverable auth flow, we need to provide the stored credentials
+        let all_credentials = sqlx::query!(
+            "SELECT credential_id, public_key FROM user_credentials"
+        )
+        .fetch_all(pool)
+        .await?;
+
+        // Deserialize all stored passkeys
+        let mut stored_passkeys = Vec::new();
+        for cred_row in all_credentials {
+            if let Ok(passkey) = serde_json::from_slice::<Passkey>(&cred_row.public_key) {
+                stored_passkeys.push(passkey);
+            }
+        }
+
+        // Start passkey authentication with the stored credentials
+        let (rcr, auth_state) = self.webauthn.start_passkey_authentication(&stored_passkeys)?;
 
         // Store challenge in database and in-memory state
         let challenge_id = Uuid::new_v4().to_string();
@@ -245,16 +261,14 @@ impl WebAuthnService {
         let auth_pk_credential: PublicKeyCredential = serde_json::from_value(request.credential)
             .map_err(|e| anyhow!("Invalid authentication credential format: {}", e))?;
 
-        // Extract credential ID to find the stored passkey
-        let credential_id = auth_pk_credential.raw_id.as_ref();
-        
-        // Find the stored credential
-        let stored_credential = UserCredential::find_by_credential_id(pool, credential_id).await?
-            .ok_or_else(|| anyhow!("Credential not found"))?;
-
-        // Verify the authentication using webauthn-rs (for passkeys, it handles resident key verification internally)
+        // Verify the authentication using webauthn-rs - this should work now since we provided the credentials during start
         let auth_result = self.webauthn.finish_passkey_authentication(&auth_pk_credential, &auth_state)
             .map_err(|e| anyhow!("Authentication verification failed: {:?}", e))?;
+
+        // Extract credential ID to find the specific stored credential for counter update
+        let credential_id = auth_pk_credential.raw_id.as_ref();
+        let stored_credential = UserCredential::find_by_credential_id(pool, credential_id).await?
+            .ok_or_else(|| anyhow!("Credential not found in database"))?;
 
         // Update credential counter
         UserCredential::update_counter(

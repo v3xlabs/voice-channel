@@ -137,7 +137,7 @@ impl InstanceSettings {
             updates.invite_permission,
             updates.invite_limit,
             updates.instance_name,
-            updates.instance_description.unwrap_or(None),
+            updates.instance_description,
         )
         .fetch_one(pool)
         .await?;

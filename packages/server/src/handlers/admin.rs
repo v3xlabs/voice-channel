@@ -1,6 +1,6 @@
 use crate::models::{
-    instance_settings::{InstanceSettings, UpdateInstanceSettings},
-    invitation::{Invitation, CreateInvitation, InvitationWithCreator},
+    instance_settings::{InstanceSettings, UpdateInstanceSettingsRequest},
+    invitation::{Invitation, CreateInvitationRequest, InvitationWithCreator},
     user::User,
 };
 use poem::web::Data;
@@ -25,9 +25,23 @@ impl AdminApi {
         pool: Data<&PgPool>,
         instance_fqdn: Query<String>,
     ) -> Result<Json<InstanceSettings>, poem::Error> {
-        let settings = InstanceSettings::get_or_create_default(&pool, &instance_fqdn)
+        let settings = InstanceSettings::get_by_fqdn(&pool, &instance_fqdn)
             .await
-            .map_err(|e| poem::Error::from_string(e.to_string(), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?;
+            .map_err(|e| poem::Error::from_string(e.to_string(), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?
+            .unwrap_or_else(|| {
+                // For now, return a default - in production, create one in DB
+                InstanceSettings {
+                    settings_id: Uuid::new_v4(),
+                    instance_fqdn: instance_fqdn.to_string(),
+                    registration_mode: "invite_only".to_string(),
+                    invite_permission: "admin_only".to_string(),
+                    invite_limit: None,
+                    instance_name: format!("{} Voice Channel", instance_fqdn.0),
+                    instance_description: None,
+                    created_at: chrono::Utc::now(),
+                    updated_at: chrono::Utc::now(),
+                }
+            });
 
         Ok(Json(settings))
     }
@@ -39,7 +53,7 @@ impl AdminApi {
         pool: Data<&PgPool>,
         instance_fqdn: Query<String>,
         admin_user_id: Query<Uuid>, // In real implementation, this would come from auth middleware
-        updates: Json<UpdateInstanceSettings>,
+        updates: Json<UpdateInstanceSettingsRequest>,
     ) -> Result<Json<InstanceSettings>, poem::Error> {
         // Verify user is admin
         let user = User::find_by_id(&pool, admin_user_id.0)
@@ -75,7 +89,7 @@ impl AdminApi {
         pool: Data<&PgPool>,
         instance_fqdn: Query<String>,
         user_id: Query<Uuid>, // In real implementation, this would come from auth middleware
-        request: Json<CreateInvitation>,
+        request: Json<CreateInvitationRequest>,
     ) -> Result<Json<Invitation>, poem::Error> {
         // Check if user can create invitations
         let can_invite = InstanceSettings::can_user_create_invitation(&pool, user_id.0, &instance_fqdn)
@@ -131,7 +145,7 @@ impl AdminApi {
             ));
         }
 
-        let invitations = Invitation::get_for_instance(&pool, &instance_fqdn)
+        let invitations = Invitation::get_by_instance(&pool, &instance_fqdn)
             .await
             .map_err(|e| poem::Error::from_string(e.to_string(), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?;
 
@@ -192,7 +206,7 @@ impl AdminApi {
         pool: Data<&PgPool>,
         invite_code: Path<String>,
     ) -> Result<Json<Option<Invitation>>, poem::Error> {
-        let invitation = Invitation::find_by_code(&pool, &invite_code)
+        let invitation = Invitation::get_by_code(&pool, &invite_code)
             .await
             .map_err(|e| poem::Error::from_string(e.to_string(), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?;
 

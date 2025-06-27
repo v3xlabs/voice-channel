@@ -155,7 +155,7 @@ impl User {
     pub async fn list_all(pool: &PgPool) -> Result<Vec<Self>, AppError> {
         let users = sqlx::query_as!(
             User,
-            "SELECT user_id, username, display_name, instance_fqdn, is_admin, created_at, updated_at FROM users ORDER BY created_at DESC"
+            "SELECT user_id, username, display_name, instance_fqdn, is_admin, has_passkey, created_at, updated_at FROM users ORDER BY created_at DESC"
         )
         .fetch_all(pool)
         .await?;

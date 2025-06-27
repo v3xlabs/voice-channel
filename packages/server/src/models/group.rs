@@ -267,10 +267,9 @@ impl GroupMembership {
 
     /// Get group members
     pub async fn get_group_members(pool: &PgPool, group_id: Uuid) -> Result<Vec<User>, AppError> {
-        let users = sqlx::query_as!(
-            User,
+        let records = sqlx::query!(
             r#"
-            SELECT u.user_id, u.username, u.display_name, u.instance_fqdn, u.is_admin, u.created_at, u.updated_at
+            SELECT u.user_id, u.username, u.display_name, u.instance_fqdn, u.is_admin, u.has_passkey, u.created_at, u.updated_at
             FROM users u
             JOIN group_memberships gm ON u.user_id = gm.user_id
             WHERE gm.group_id = $1
@@ -280,6 +279,20 @@ impl GroupMembership {
         )
         .fetch_all(pool)
         .await?;
+
+        let users = records
+            .into_iter()
+            .map(|record| User {
+                user_id: record.user_id,
+                username: record.username,
+                display_name: record.display_name,
+                instance_fqdn: record.instance_fqdn,
+                is_admin: record.is_admin,
+                has_passkey: record.has_passkey,
+                created_at: record.created_at,
+                updated_at: record.updated_at,
+            })
+            .collect();
 
         Ok(users)
     }

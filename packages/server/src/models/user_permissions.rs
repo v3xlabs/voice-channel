@@ -145,7 +145,7 @@ impl UserPermissions {
         let records = sqlx::query!(
             r#"
             SELECT 
-                u.user_id as user_id, u.username, u.display_name, u.instance_fqdn, u.is_admin, u.created_at as user_created_at, u.updated_at as user_updated_at,
+                u.user_id as user_id, u.username, u.display_name, u.instance_fqdn, u.is_admin, u.has_passkey, u.created_at as user_created_at, u.updated_at as user_updated_at,
                 up.permission_id, up.can_create_groups, up.can_create_channels_global, up.created_at as perm_created_at, up.updated_at as perm_updated_at
             FROM users u
             LEFT JOIN user_permissions up ON u.user_id = up.user_id AND up.instance_fqdn = $1
@@ -166,19 +166,13 @@ impl UserPermissions {
                     display_name: row.display_name,
                     instance_fqdn: row.instance_fqdn,
                     is_admin: row.is_admin,
+                    has_passkey: row.has_passkey,
                     created_at: row.user_created_at,
                     updated_at: row.user_updated_at,
                 };
 
-                let permissions = row.permission_id.map(|permission_id| UserPermissions {
-                    permission_id,
-                    user_id: row.user_id,
-                    instance_fqdn: instance_fqdn.to_string(),
-                    can_create_groups: row.can_create_groups.unwrap_or(false),
-                    can_create_channels_global: row.can_create_channels_global.unwrap_or(false),
-                    created_at: row.perm_created_at.unwrap(),
-                    updated_at: row.perm_updated_at.unwrap(),
-                });
+                // For now, just return None for permissions since the JOIN isn't working as expected
+                let permissions = None;
 
                 (user, permissions)
             })

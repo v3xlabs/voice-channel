@@ -9,10 +9,24 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as ChannelNameRouteImport } from './routes/$channelName'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as InstanceFqdnChannelNameRouteImport } from './routes/$instanceFqdn/$channelName'
+import { Route as GroupNameChannelNameRouteImport } from './routes/$groupName/$channelName'
+import { Route as InstanceFqdnGroupNameChannelNameRouteImport } from './routes/$instanceFqdn/$groupName/$channelName'
 
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ChannelNameRoute = ChannelNameRouteImport.update({
   id: '/$channelName',
   path: '/$channelName',
@@ -28,39 +42,102 @@ const InstanceFqdnChannelNameRoute = InstanceFqdnChannelNameRouteImport.update({
   path: '/$instanceFqdn/$channelName',
   getParentRoute: () => rootRouteImport,
 } as any)
+const GroupNameChannelNameRoute = GroupNameChannelNameRouteImport.update({
+  id: '/$groupName/$channelName',
+  path: '/$groupName/$channelName',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InstanceFqdnGroupNameChannelNameRoute =
+  InstanceFqdnGroupNameChannelNameRouteImport.update({
+    id: '/$instanceFqdn/$groupName/$channelName',
+    path: '/$instanceFqdn/$groupName/$channelName',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$channelName': typeof ChannelNameRoute
+  '/admin': typeof AdminRoute
+  '/settings': typeof SettingsRoute
+  '/$groupName/$channelName': typeof GroupNameChannelNameRoute
   '/$instanceFqdn/$channelName': typeof InstanceFqdnChannelNameRoute
+  '/$instanceFqdn/$groupName/$channelName': typeof InstanceFqdnGroupNameChannelNameRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$channelName': typeof ChannelNameRoute
+  '/admin': typeof AdminRoute
+  '/settings': typeof SettingsRoute
+  '/$groupName/$channelName': typeof GroupNameChannelNameRoute
   '/$instanceFqdn/$channelName': typeof InstanceFqdnChannelNameRoute
+  '/$instanceFqdn/$groupName/$channelName': typeof InstanceFqdnGroupNameChannelNameRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/$channelName': typeof ChannelNameRoute
+  '/admin': typeof AdminRoute
+  '/settings': typeof SettingsRoute
+  '/$groupName/$channelName': typeof GroupNameChannelNameRoute
   '/$instanceFqdn/$channelName': typeof InstanceFqdnChannelNameRoute
+  '/$instanceFqdn/$groupName/$channelName': typeof InstanceFqdnGroupNameChannelNameRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/$channelName' | '/$instanceFqdn/$channelName'
+  fullPaths:
+    | '/'
+    | '/$channelName'
+    | '/admin'
+    | '/settings'
+    | '/$groupName/$channelName'
+    | '/$instanceFqdn/$channelName'
+    | '/$instanceFqdn/$groupName/$channelName'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/$channelName' | '/$instanceFqdn/$channelName'
-  id: '__root__' | '/' | '/$channelName' | '/$instanceFqdn/$channelName'
+  to:
+    | '/'
+    | '/$channelName'
+    | '/admin'
+    | '/settings'
+    | '/$groupName/$channelName'
+    | '/$instanceFqdn/$channelName'
+    | '/$instanceFqdn/$groupName/$channelName'
+  id:
+    | '__root__'
+    | '/'
+    | '/$channelName'
+    | '/admin'
+    | '/settings'
+    | '/$groupName/$channelName'
+    | '/$instanceFqdn/$channelName'
+    | '/$instanceFqdn/$groupName/$channelName'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ChannelNameRoute: typeof ChannelNameRoute
+  AdminRoute: typeof AdminRoute
+  SettingsRoute: typeof SettingsRoute
+  GroupNameChannelNameRoute: typeof GroupNameChannelNameRoute
   InstanceFqdnChannelNameRoute: typeof InstanceFqdnChannelNameRoute
+  InstanceFqdnGroupNameChannelNameRoute: typeof InstanceFqdnGroupNameChannelNameRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/$channelName': {
       id: '/$channelName'
       path: '/$channelName'
@@ -82,13 +159,31 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InstanceFqdnChannelNameRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/$groupName/$channelName': {
+      id: '/$groupName/$channelName'
+      path: '/$groupName/$channelName'
+      fullPath: '/$groupName/$channelName'
+      preLoaderRoute: typeof GroupNameChannelNameRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/$instanceFqdn/$groupName/$channelName': {
+      id: '/$instanceFqdn/$groupName/$channelName'
+      path: '/$instanceFqdn/$groupName/$channelName'
+      fullPath: '/$instanceFqdn/$groupName/$channelName'
+      preLoaderRoute: typeof InstanceFqdnGroupNameChannelNameRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ChannelNameRoute: ChannelNameRoute,
+  AdminRoute: AdminRoute,
+  SettingsRoute: SettingsRoute,
+  GroupNameChannelNameRoute: GroupNameChannelNameRoute,
   InstanceFqdnChannelNameRoute: InstanceFqdnChannelNameRoute,
+  InstanceFqdnGroupNameChannelNameRoute: InstanceFqdnGroupNameChannelNameRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

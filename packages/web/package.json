@@ -11,36 +11,37 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "@tanstack/react-router": "^1.58.3",
-    "@tanstack/react-query": "^5.56.2",
-    "@radix-ui/react-slot": "^1.0.2",
     "@radix-ui/react-dialog": "^1.0.5",
     "@radix-ui/react-label": "^2.1.7",
-    "lucide-react": "^0.294.0",
-    "openapi-hooks": "^0.0.6",
-    "mediasoup-client": "^3.7.4",
+    "@radix-ui/react-slot": "^1.0.2",
     "@simplewebauthn/browser": "^9.0.0",
-    "classnames": "^2.3.2"
+    "@tanstack/react-query": "^5.56.2",
+    "@tanstack/react-router": "^1.122.0",
+    "classnames": "^2.3.2",
+    "lucide-react": "^0.294.0",
+    "mediasoup-client": "^3.7.4",
+    "openapi-hooks": "^0.0.6",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
   },
   "devDependencies": {
+    "@tanstack/router-cli": "^1.122.0",
+    "@tanstack/router-devtools": "^1.122.0",
+    "@tanstack/router-vite-plugin": "^1.122.0",
     "@types/react": "^18.2.37",
     "@types/react-dom": "^18.2.15",
     "@typescript-eslint/eslint-plugin": "^6.10.0",
     "@typescript-eslint/parser": "^6.10.0",
     "@vitejs/plugin-react": "^4.1.1",
     "autoprefixer": "^10.4.16",
+    "concurrently": "^8.2.2",
     "eslint": "^8.53.0",
     "eslint-plugin-react-hooks": "^4.6.0",
     "eslint-plugin-react-refresh": "^0.4.4",
+    "openapi-typescript": "^7.4.0",
     "postcss": "^8.4.31",
     "tailwindcss": "^3.3.5",
     "typescript": "^5.2.2",
-    "vite": "^4.5.0",
-    "openapi-typescript": "^7.4.0",
-    "concurrently": "^8.2.2",
-    "@tanstack/router-devtools": "^1.58.3",
-    "@tanstack/router-cli": "^1.58.3"
+    "vite": "^5.4.19"
   }
 }

@@ -46,11 +46,8 @@ impl WebAuthnService {
         // Check registration mode and validate invite if needed
         let settings = InstanceSettings::get_or_create_default(pool, &self.instance_fqdn).await?;
         
-        let mut validated_invite: Option<Invitation> = None;
-        
         match settings.registration_mode.as_str() {
             "open" => {
-                // Open registration - no invite needed
                 tracing::info!("Open registration for display_name: {}", request.display_name);
             }
             "invite-only" => {
@@ -64,32 +61,32 @@ impl WebAuthnService {
                     return Err(anyhow!("Invite code expired or exhausted"));
                 }
                 
-                validated_invite = Some(invitation);
                 tracing::info!("Invite-only registration with code: {}", invite_code);
             }
             _ => return Err(anyhow!("Registration not allowed")),
         }
 
-        // Generate a unique ID for the challenge (not a user ID yet)
-        let user_unique_id = Uuid::new_v4().to_string();
+        // Generate a unique ID for the challenge
+        let user_unique_id = Uuid::new_v4();
         
-        // Start WebAuthn registration - passkey registration should create discoverable credentials
-        let (mut ccr, _reg_state) = self.webauthn.start_passkey_registration(
-            Uuid::parse_str(&user_unique_id)?,
+        // Start WebAuthn registration with resident key requirements
+        let (mut ccr, reg_state) = self.webauthn.start_passkey_registration(
+            user_unique_id,
             &request.display_name,
             &request.display_name,
             None,
         )?;
 
-        // Manually override the authenticator selection to require resident keys
+        // Force discoverable credentials for usernameless authentication
         if let Some(ref mut auth_sel) = ccr.public_key.authenticator_selection {
             auth_sel.require_resident_key = true;
             auth_sel.resident_key = Some(ResidentKeyRequirement::Required);
         }
 
-        // Store challenge in database
+        // Store challenge state in database (using base64 encoding for binary data)
         let challenge_id = Uuid::new_v4().to_string();
-        let challenge_data = format!("temp_registration_state_{}", challenge_id); // Temporary placeholder
+        let challenge_data = base64::encode(bincode::serialize(&reg_state)
+            .map_err(|e| anyhow!("Failed to serialize registration state: {}", e))?);
         
         WebAuthnChallenge::create(
             pool,
@@ -121,23 +118,21 @@ impl WebAuthnService {
             return Err(anyhow!("Invalid challenge type"));
         }
 
-        // Extract credential ID from the WebAuthn credential response
-        let credential_id = request.credential
-            .get("id")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| anyhow!("Missing credential ID in response"))?;
-
-        // For development, we'll store basic credential data
-        // In production, this would properly verify the attestation and extract public key
-        use base64::Engine;
-        let credential_id_bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
-            .decode(credential_id)
-            .map_err(|_| anyhow!("Invalid credential ID format"))?;
+        // Deserialize registration state
+        let challenge_bytes = base64::decode(&challenge.challenge_data)
+            .map_err(|e| anyhow!("Failed to decode challenge data: {}", e))?;
+        let reg_state: PasskeyRegistration = bincode::deserialize(&challenge_bytes)
+            .map_err(|e| anyhow!("Failed to deserialize registration state: {}", e))?;
         
-        // Store a placeholder public key (in production, extract from attestation)
-        let public_key = vec![1, 2, 3, 4]; // TODO: Extract actual public key from credential.response.publicKey
+        // Parse the credential from the frontend response
+        let register_pk_credential: RegisterPublicKeyCredential = serde_json::from_value(request.credential)
+            .map_err(|e| anyhow!("Invalid credential format: {}", e))?;
 
-        // Validate invite again if needed (double-check)
+        // Verify the registration using webauthn-rs
+        let passkey = self.webauthn.finish_passkey_registration(&register_pk_credential, &reg_state)
+            .map_err(|e| anyhow!("Registration verification failed: {:?}", e))?;
+
+        // Validate invite again if needed
         if let Some(invite_code) = &challenge.invite_code {
             let invitation = Invitation::find_by_code(pool, invite_code).await?
                 .ok_or_else(|| anyhow!("Invite code no longer valid"))?;
@@ -162,11 +157,15 @@ impl WebAuthnService {
             Invitation::use_invitation(pool, invite_code, user.id).await?;
         }
 
-        // Store the actual credential with real credential ID
+        // Store the verified credential (serialize passkey as JSON for storage)
+        let credential_id = passkey.cred_id().to_vec();
+        let public_key = bincode::serialize(&passkey)
+            .map_err(|e| anyhow!("Failed to serialize passkey: {}", e))?;
+
         UserCredential::create(
             pool,
             user.id,
-            credential_id_bytes,
+            credential_id,
             public_key,
             0,
             Some(format!("{}'s Passkey", display_name)),
@@ -175,7 +174,7 @@ impl WebAuthnService {
         // Clean up challenge
         WebAuthnChallenge::delete(pool, &request.challenge_id).await?;
 
-        tracing::info!("Successfully registered user {} with passkey (cred: {})", user.username, credential_id);
+        tracing::info!("Successfully registered user {} with verified passkey", user.username);
 
         Ok(RegisterFinishResponse {
             user,
@@ -189,13 +188,13 @@ impl WebAuthnService {
         pool: &PgPool,
         _request: LoginBeginRequest,
     ) -> Result<LoginBeginResponse> {
-        // For resident key passkeys, we use empty allowCredentials for usernameless auth
-        // The resident key requirement ensures discoverability
-        let (rcr, _auth_state) = self.webauthn.start_passkey_authentication(&[])?;
+        // For resident key authentication, use empty allowCredentials for usernameless auth
+        let (rcr, auth_state) = self.webauthn.start_passkey_authentication(&[])?;
 
-        // Store challenge in database
+        // Store challenge state in database
         let challenge_id = Uuid::new_v4().to_string();
-        let challenge_data = format!("temp_auth_state_{}", challenge_id); // Temporary placeholder
+        let challenge_data = base64::encode(bincode::serialize(&auth_state)
+            .map_err(|e| anyhow!("Failed to serialize authentication state: {}", e))?);
         
         WebAuthnChallenge::create(
             pool,
@@ -227,27 +226,36 @@ impl WebAuthnService {
             return Err(anyhow!("Invalid challenge type"));
         }
 
-        // Extract credential ID from the WebAuthn authentication response
-        let credential_id = request.credential
-            .get("id")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| anyhow!("Missing credential ID in authentication response"))?;
+        // Deserialize authentication state
+        let challenge_bytes = base64::decode(&challenge.challenge_data)
+            .map_err(|e| anyhow!("Failed to decode challenge data: {}", e))?;
+        let auth_state: PasskeyAuthentication = bincode::deserialize(&challenge_bytes)
+            .map_err(|e| anyhow!("Failed to deserialize authentication state: {}", e))?;
 
-        use base64::Engine;
-        let credential_id_bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
-            .decode(credential_id)
-            .map_err(|_| anyhow!("Invalid credential ID format"))?;
+        // Parse the authentication credential from frontend
+        let auth_pk_credential: PublicKeyCredential = serde_json::from_value(request.credential)
+            .map_err(|e| anyhow!("Invalid authentication credential format: {}", e))?;
+
+        // Extract credential ID to find the stored passkey
+        let credential_id = auth_pk_credential.raw_id.as_ref();
         
-        // Find the stored credential using the real credential ID
-        let stored_credential = UserCredential::find_by_credential_id(pool, &credential_id_bytes).await?
+        // Find the stored credential
+        let stored_credential = UserCredential::find_by_credential_id(pool, credential_id).await?
             .ok_or_else(|| anyhow!("Credential not found"))?;
 
-        // In production, we would verify the authentication signature here
-        // For now, we'll just update the counter (successful auth)
+        // Deserialize the stored passkey
+        let stored_passkey: Passkey = bincode::deserialize(&stored_credential.public_key)
+            .map_err(|e| anyhow!("Failed to deserialize stored passkey: {}", e))?;
+
+        // Verify the authentication using webauthn-rs
+        let auth_result = self.webauthn.finish_passkey_authentication(&auth_pk_credential, &auth_state)
+            .map_err(|e| anyhow!("Authentication verification failed: {:?}", e))?;
+
+        // Update credential counter
         UserCredential::update_counter(
             pool,
             &stored_credential.credential_id,
-            stored_credential.counter + 1,
+            auth_result.counter() as i64,
         ).await?;
 
         // Get user
@@ -257,7 +265,7 @@ impl WebAuthnService {
         // Clean up challenge
         WebAuthnChallenge::delete(pool, &request.challenge_id).await?;
 
-        tracing::info!("Successfully authenticated user {} with credential {}", user.username, credential_id);
+        tracing::info!("Successfully authenticated user {} with verified credential", user.username);
 
         Ok(LoginFinishResponse { user })
     }

@@ -4,10 +4,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use uuid::Uuid;
 use anyhow::Result;
-use webauthn_rs_proto::{
-    CreationChallengeResponse, RegisterPublicKeyCredential, RequestChallengeResponse,
-    AuthenticationExtensions,
-};
+// WebAuthn types are now imported in the service layer where they're used
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserCredential {

@@ -1,6 +1,7 @@
 import { FC, ReactNode, useEffect, useState } from 'react';
 import { authService, type User, type ChannelWithMembership } from '../services/auth';
 import { LoginForm } from './LoginForm';
+import { Link } from '@tanstack/react-router';
 
 interface LayoutProps {
   children: ReactNode;
@@ -109,31 +110,31 @@ export const Layout: FC<LayoutProps> = ({ children }) => {
       <div className="w-64 bg-gray-800 border-r border-gray-700 flex flex-col">
         {/* Instance Header */}
         <div className="p-4 border-b border-gray-700">
-          <a
-            href="/"
+          <Link
+            to="/"
             className="block text-center hover:bg-gray-700 rounded-lg px-3 py-2 transition-colors"
           >
             <h1 className="text-lg font-bold text-white">voice.channel</h1>
             <p className="text-xs text-gray-400">Home</p>
-          </a>
+          </Link>
         </div>
 
         {/* Navigation */}
         <div className="p-4 border-b border-gray-700">
           <div className="space-y-2">
-            <a
-              href="/"
+            <Link
+              to="/"
               className="flex items-center w-full text-left px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-gray-700 rounded"
             >
               <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
               Discover Channels
-            </a>
+            </Link>
             
             {user?.is_admin && (
-              <a
-                href="/admin"
+              <Link
+                to="/admin"
                 className="flex items-center w-full text-left px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-gray-700 rounded"
               >
                 <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -141,7 +142,7 @@ export const Layout: FC<LayoutProps> = ({ children }) => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
                 Admin Panel
-              </a>
+              </Link>
             )}
           </div>
         </div>
@@ -236,8 +237,8 @@ const ChannelItem: FC<ChannelItemProps> = ({ channelWithMembership, onLeave }) =
   
   return (
     <div className="group flex items-center justify-between px-3 py-2 rounded hover:bg-gray-700">
-      <a 
-        href={channelUrl}
+      <Link
+        to={channelUrl}
         className="flex items-center space-x-2 flex-1 min-w-0 text-left"
       >
         <span className="text-gray-400">#</span>
@@ -249,7 +250,7 @@ const ChannelItem: FC<ChannelItemProps> = ({ channelWithMembership, onLeave }) =
             remote
           </span>
         )}
-      </a>
+      </Link>
       
       <button
         onClick={() => onLeave(membership.channel_instance_fqdn, membership.channel_name)}

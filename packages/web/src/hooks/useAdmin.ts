@@ -1,18 +1,10 @@
 import { useQuery, useMutation, useQueryClient, queryOptions } from '@tanstack/react-query';
 import { apiFetch } from '../services/api';
 import { useUser } from './useUser';
-import type { components } from '../types/api';
+import type { components } from '../schema.gen';
 
-type InstanceSettings = components['schemas']['InstanceSettings'];
 type User = components['schemas']['User'];
 type Invitation = components['schemas']['Invitation'];
-
-// Create types for data we need that might not be in the generated schema yet
-interface CreateInvitationRequest {
-  max_uses?: number;
-  expires_at?: string;
-  invited_email?: string;
-}
 
 interface InvitationWithCreator extends Invitation {
   creator_username: string;

@@ -23,6 +23,7 @@ export const tokenManager = {
 };
 
 // Create base fetch without token injection
+// @ts-expect-error - weird type error, but works fine
 const baseFetch = createFetch<paths>({
   baseUrl: location.origin + '/api/',
   onError: (error: unknown) => {

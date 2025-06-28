@@ -1,11 +1,13 @@
-use crate::models::{
-    instance_settings::{InstanceSettings, UpdateInstanceSettingsRequest},
-    invitation::{Invitation, CreateInvitationRequest, InvitationWithCreator},
-    user::User,
+use crate::{
+    models::{
+        instance_settings::{InstanceSettings, UpdateInstanceSettingsRequest},
+        invitation::{Invitation, CreateInvitationRequest, InvitationWithCreator},
+        user::User,
+    },
+    AppState,
 };
-use poem::web::Data;
 use poem_openapi::{param::Path, param::Query, payload::Json, OpenApi, Tags};
-use sqlx::PgPool;
+use std::sync::Arc;
 use uuid::Uuid;
 
 #[derive(Tags)]
@@ -14,7 +16,9 @@ enum AdminApiTags {
     Admin,
 }
 
-pub struct AdminApi;
+pub struct AdminApi {
+    pub state: Arc<AppState>,
+}
 
 #[OpenApi]
 impl AdminApi {
@@ -22,10 +26,9 @@ impl AdminApi {
     #[oai(path = "/admin/settings", method = "get", tag = "AdminApiTags::Admin")]
     async fn get_instance_settings(
         &self,
-        pool: Data<&PgPool>,
         instance_fqdn: Query<String>,
     ) -> Result<Json<InstanceSettings>, poem::Error> {
-        let settings = InstanceSettings::get_by_fqdn(&pool, &instance_fqdn)
+        let settings = InstanceSettings::get_by_fqdn(&self.state.db.pool, &instance_fqdn)
             .await
             .map_err(|e| poem::Error::from_string(e.to_string(), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?
             .unwrap_or_else(|| {
@@ -50,13 +53,12 @@ impl AdminApi {
     #[oai(path = "/admin/settings", method = "patch", tag = "AdminApiTags::Admin")]
     async fn update_instance_settings(
         &self,
-        pool: Data<&PgPool>,
         instance_fqdn: Query<String>,
         admin_user_id: Query<Uuid>, // In real implementation, this would come from auth middleware
         updates: Json<UpdateInstanceSettingsRequest>,
     ) -> Result<Json<InstanceSettings>, poem::Error> {
         // Verify user is admin
-        let user = User::find_by_id(&pool, admin_user_id.0)
+        let user = User::find_by_id(&self.state.db.pool, admin_user_id.0)
             .await
             .map_err(|e| poem::Error::from_string(e.to_string(), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?
             .ok_or_else(|| poem::Error::from_string("User not found", poem::http::StatusCode::NOT_FOUND))?;
@@ -75,7 +77,7 @@ impl AdminApi {
             ));
         }
 
-        let settings = InstanceSettings::update(&pool, &instance_fqdn, updates.0)
+        let settings = InstanceSettings::update(&self.state.db.pool, &instance_fqdn, updates.0)
             .await
             .map_err(|e| poem::Error::from_string(e.to_string(), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?;
 
@@ -86,13 +88,12 @@ impl AdminApi {
     #[oai(path = "/admin/invitations", method = "post", tag = "AdminApiTags::Admin")]
     async fn create_invitation(
         &self,
-        pool: Data<&PgPool>,
         instance_fqdn: Query<String>,
         user_id: Query<Uuid>, // In real implementation, this would come from auth middleware
         request: Json<CreateInvitationRequest>,
     ) -> Result<Json<Invitation>, poem::Error> {
         // Check if user can create invitations
-        let can_invite = InstanceSettings::can_user_create_invitation(&pool, user_id.0, &instance_fqdn)
+        let can_invite = InstanceSettings::can_user_create_invitation(&self.state.db.pool, user_id.0, &instance_fqdn)
             .await
             .map_err(|e| poem::Error::from_string(e.to_string(), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?;
 
@@ -103,7 +104,7 @@ impl AdminApi {
             ));
         }
 
-        let invitation = Invitation::create(&pool, user_id.0, instance_fqdn.0, request.0)
+        let invitation = Invitation::create(&self.state.db.pool, user_id.0, instance_fqdn.0, request.0)
             .await
             .map_err(|e| poem::Error::from_string(e.to_string(), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?;
 
@@ -114,10 +115,9 @@ impl AdminApi {
     #[oai(path = "/admin/invitations/my", method = "get", tag = "AdminApiTags::Admin")]
     async fn get_my_invitations(
         &self,
-        pool: Data<&PgPool>,
         user_id: Query<Uuid>,
     ) -> Result<Json<Vec<Invitation>>, poem::Error> {
-        let invitations = Invitation::get_by_creator(&pool, user_id.0)
+        let invitations = Invitation::get_by_creator(&self.state.db.pool, user_id.0)
             .await
             .map_err(|e| poem::Error::from_string(e.to_string(), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?;
 
@@ -128,12 +128,11 @@ impl AdminApi {
     #[oai(path = "/admin/invitations", method = "get", tag = "AdminApiTags::Admin")]
     async fn get_instance_invitations(
         &self,
-        pool: Data<&PgPool>,
         instance_fqdn: Query<String>,
         admin_user_id: Query<Uuid>,
     ) -> Result<Json<Vec<InvitationWithCreator>>, poem::Error> {
         // Verify user is admin
-        let user = User::find_by_id(&pool, admin_user_id.0)
+        let user = User::find_by_id(&self.state.db.pool, admin_user_id.0)
             .await
             .map_err(|e| poem::Error::from_string(e.to_string(), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?
             .ok_or_else(|| poem::Error::from_string("User not found", poem::http::StatusCode::NOT_FOUND))?;
@@ -145,7 +144,7 @@ impl AdminApi {
             ));
         }
 
-        let invitations = Invitation::get_by_instance(&pool, &instance_fqdn)
+        let invitations = Invitation::get_by_instance_with_creator(&self.state.db.pool, &instance_fqdn)
             .await
             .map_err(|e| poem::Error::from_string(e.to_string(), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?;
 
@@ -156,12 +155,11 @@ impl AdminApi {
     #[oai(path = "/admin/invitations/{invitation_id}/deactivate", method = "post", tag = "AdminApiTags::Admin")]
     async fn deactivate_invitation(
         &self,
-        pool: Data<&PgPool>,
         invitation_id: Path<Uuid>,
-        user_id: Query<Uuid>,
+        _user_id: Query<Uuid>,
     ) -> Result<Json<bool>, poem::Error> {
         // In a real implementation, you'd verify the user owns this invitation or is admin
-        let success = Invitation::deactivate(&pool, invitation_id.0)
+        let success = Invitation::deactivate(&self.state.db.pool, invitation_id.0)
             .await
             .map_err(|e| poem::Error::from_string(e.to_string(), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?;
 
@@ -172,12 +170,11 @@ impl AdminApi {
     #[oai(path = "/admin/invitations/{invitation_id}", method = "delete", tag = "AdminApiTags::Admin")]
     async fn delete_invitation(
         &self,
-        pool: Data<&PgPool>,
         invitation_id: Path<Uuid>,
-        user_id: Query<Uuid>,
+        _user_id: Query<Uuid>,
     ) -> Result<Json<bool>, poem::Error> {
         // In a real implementation, you'd verify the user owns this invitation or is admin
-        let success = Invitation::delete(&pool, invitation_id.0)
+        let success = Invitation::delete(&self.state.db.pool, invitation_id.0)
             .await
             .map_err(|e| poem::Error::from_string(e.to_string(), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?;
 
@@ -188,25 +185,23 @@ impl AdminApi {
     #[oai(path = "/invitations/{invite_code}/use", method = "post", tag = "AdminApiTags::Admin")]
     async fn use_invitation(
         &self,
-        pool: Data<&PgPool>,
         invite_code: Path<String>,
         user_id: Query<Uuid>,
     ) -> Result<Json<Option<Invitation>>, poem::Error> {
-        let invitation = Invitation::use_invitation(&pool, &invite_code, user_id.0)
+        let invitation = Invitation::use_invitation(&self.state.db.pool, &invite_code, user_id.0)
             .await
             .map_err(|e| poem::Error::from_string(e.to_string(), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?;
 
-        Ok(Json(invitation))
+        Ok(Json(Some(invitation)))
     }
 
     /// Get invitation details by code (for registration page)
     #[oai(path = "/invitations/{invite_code}", method = "get", tag = "AdminApiTags::Admin")]
     async fn get_invitation_by_code(
         &self,
-        pool: Data<&PgPool>,
         invite_code: Path<String>,
     ) -> Result<Json<Option<Invitation>>, poem::Error> {
-        let invitation = Invitation::get_by_code(&pool, &invite_code)
+        let invitation = Invitation::get_by_code(&self.state.db.pool, &invite_code)
             .await
             .map_err(|e| poem::Error::from_string(e.to_string(), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?;
 
@@ -226,12 +221,11 @@ impl AdminApi {
     #[oai(path = "/admin/users", method = "get", tag = "AdminApiTags::Admin")]
     async fn get_instance_users(
         &self,
-        pool: Data<&PgPool>,
         instance_fqdn: Query<String>,
         admin_user_id: Query<Uuid>,
     ) -> Result<Json<Vec<User>>, poem::Error> {
         // Verify user is admin
-        let user = User::find_by_id(&pool, admin_user_id.0)
+        let user = User::find_by_id(&self.state.db.pool, admin_user_id.0)
             .await
             .map_err(|e| poem::Error::from_string(e.to_string(), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?
             .ok_or_else(|| poem::Error::from_string("User not found", poem::http::StatusCode::NOT_FOUND))?;
@@ -243,7 +237,7 @@ impl AdminApi {
             ));
         }
 
-        let users = User::list_by_instance(&pool, &instance_fqdn)
+        let users = User::list_by_instance(&self.state.db.pool, &instance_fqdn)
             .await
             .map_err(|e| poem::Error::from_string(e.to_string(), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?;
 

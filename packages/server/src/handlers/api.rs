@@ -379,69 +379,7 @@ impl Api {
         poem_openapi::payload::Json(members)
     }
 
-    // Admin Endpoints
-
-    /// Get instance settings
-    #[oai(path = "/admin/settings", method = "get", tag = "ApiTags::Admin")]
-    async fn get_instance_settings(
-        &self,
-    ) -> poem_openapi::payload::Json<Option<InstanceSettings>> {
-        let settings = InstanceSettings::get_by_fqdn(&self.state.db.pool, &self.state.config.instance_fqdn)
-            .await
-            .expect("Failed to get instance settings");
-
-        poem_openapi::payload::Json(settings)
-    }
-
-    /// Check if registration is open
-    #[oai(path = "/admin/registration-status", method = "get", tag = "ApiTags::Admin")]
-    async fn get_registration_status(
-        &self,
-    ) -> poem_openapi::payload::Json<serde_json::Value> {
-        let settings = InstanceSettings::get_by_fqdn(&self.state.db.pool, &self.state.config.instance_fqdn)
-            .await
-            .expect("Failed to get instance settings")
-            .unwrap_or_else(|| InstanceSettings {
-                settings_id: Uuid::new_v4(),
-                instance_fqdn: self.state.config.instance_fqdn.clone(),
-                registration_mode: "invite_only".to_string(),
-                invite_permission: "admin_only".to_string(),
-                invite_limit: None,
-                instance_name: format!("{} Voice Channel", self.state.config.instance_fqdn),
-                instance_description: None,
-                created_at: chrono::Utc::now(),
-                updated_at: chrono::Utc::now(),
-            });
-
-        poem_openapi::payload::Json(serde_json::json!({
-            "registration_open": settings.registration_mode == "open",
-            "registration_mode": settings.registration_mode,
-            "invite_permission": settings.invite_permission,
-            "instance_name": settings.instance_name
-        }))
-    }
-
-    /// Get invitation details by code (for registration page)
-    #[oai(path = "/invitations/:invite_code", method = "get", tag = "ApiTags::Admin")]
-    async fn get_invitation_by_code(
-        &self,
-        invite_code: Path<String>,
-    ) -> poem_openapi::payload::Json<Option<Invitation>> {
-        let invitation = Invitation::get_by_code(&self.state.db.pool, &invite_code)
-            .await
-            .expect("Failed to get invitation");
-
-        // Only return if invitation is valid
-        if let Some(inv) = invitation {
-            if inv.is_valid() {
-                poem_openapi::payload::Json(Some(inv))
-            } else {
-                poem_openapi::payload::Json(None)
-            }
-        } else {
-            poem_openapi::payload::Json(None)
-        }
-    }
+    // Note: Admin endpoints moved to AdminApi
 
     // WebAuthn Endpoints
 

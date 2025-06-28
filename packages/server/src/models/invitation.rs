@@ -223,6 +223,52 @@ impl Invitation {
         Ok(invitations)
     }
 
+    /// Get all invitations for an instance with creator info (admin only)
+    pub async fn get_by_instance_with_creator(
+        pool: &PgPool,
+        instance_fqdn: &str,
+    ) -> Result<Vec<InvitationWithCreator>, AppError> {
+        let rows = sqlx::query!(
+            r#"
+            SELECT i.invitation_id, i.instance_fqdn, i.invite_code, i.created_by, i.invited_by, i.invited_email, 
+                   i.max_uses, i.current_uses, i.expires_at, i.is_active, i.created_at, i.used_at, i.updated_at,
+                   u.username as creator_username, u.display_name as creator_display_name
+            FROM invitations i
+            LEFT JOIN users u ON i.created_by = u.user_id
+            WHERE i.instance_fqdn = $1
+            ORDER BY i.created_at DESC
+            "#,
+            instance_fqdn
+        )
+        .fetch_all(pool)
+        .await?;
+
+        let invitations = rows
+            .into_iter()
+            .map(|row| InvitationWithCreator {
+                invitation: Invitation {
+                    invitation_id: row.invitation_id,
+                    invite_code: row.invite_code,
+                    created_by: row.created_by,
+                    invited_by: row.invited_by,
+                    invited_email: row.invited_email,
+                    instance_fqdn: row.instance_fqdn,
+                    max_uses: row.max_uses,
+                    current_uses: row.current_uses,
+                    is_active: row.is_active,
+                    expires_at: row.expires_at,
+                    used_at: row.used_at,
+                    created_at: row.created_at,
+                    updated_at: row.updated_at,
+                },
+                creator_username: row.creator_username,
+                creator_display_name: row.creator_display_name,
+            })
+            .collect();
+
+        Ok(invitations)
+    }
+
     /// Check if invitation is valid and can be used
     pub fn is_valid(&self) -> bool {
         if !self.is_active {

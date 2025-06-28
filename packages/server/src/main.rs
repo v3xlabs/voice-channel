@@ -19,6 +19,7 @@ mod services;
 
 use config::Config;
 use database::Database;
+use handlers::admin::AdminApi;
 use handlers::api::Api;
 use handlers::setup::SetupApi;
 use services::mediasoup_service::MediasoupService;
@@ -108,9 +109,15 @@ async fn main() -> Result<()> {
         webauthn,
     });
 
-    // Create unified API service that includes both channel and WebRTC endpoints
-    let api_service = OpenApiService::new(Api { state: state.clone() }, "Voice Channel API", "1.0")
-        .server("http://localhost:3001/api");
+    // Create unified API service that includes channel, WebRTC, and admin endpoints
+    let api_service = OpenApiService::new(
+        (
+            Api { state: state.clone() },
+            AdminApi { state: state.clone() },
+        ),
+        "Voice Channel API", 
+        "1.0"
+    ).server("http://localhost:3001/api");
     
     // Create setup API service for bootstrap functionality
     let setup_api_service = OpenApiService::new(

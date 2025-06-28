@@ -222,15 +222,14 @@ impl WebAuthnService {
 
         // Store the credential - convert credential ID to base64 string
         let credential_id = general_purpose::STANDARD.encode(passkey.cred_id());
-        let public_key_json = serde_json::to_string(&passkey)
+        let public_key_json = serde_json::to_vec(&passkey)
             .map_err(|e| anyhow!("Failed to serialize passkey: {}", e))?;
-        let public_key_bytes = public_key_json.as_bytes().to_vec();
 
         crate::models::webauthn::UserCredential::store_credential(
             pool,
             final_user.user_id,
             &credential_id,
-            &public_key_bytes,
+            &public_key_json,
             0, // Start with counter 0 for new passkeys
             Some("Primary Passkey".to_string()),
         ).await
@@ -311,16 +310,9 @@ impl WebAuthnService {
             .map_err(|e| anyhow!("Database error while looking up credential: {}", e))?
             .ok_or_else(|| anyhow!("Credential not found or not registered"))?;
 
-        // Deserialize the stored passkey - try JSON first, fallback to bincode for backward compatibility
-        let passkey: Passkey = if let Ok(json_str) = std::str::from_utf8(&user_credential.public_key) {
-            // Try JSON deserialization first (new format)
-            serde_json::from_str(json_str)
-                .map_err(|e| anyhow!("Failed to deserialize stored passkey from JSON: {}", e))?
-        } else {
-            // Fallback to bincode for backward compatibility (old format)
-            bincode::deserialize(&user_credential.public_key)
-                .map_err(|e| anyhow!("Failed to deserialize stored passkey from bincode: {}", e))?
-        };
+        // Deserialize the stored passkey
+        let passkey: Passkey = serde_json::from_slice(&user_credential.public_key)
+            .map_err(|e| anyhow!("Failed to deserialize stored passkey: {}", e))?;
         
         // Finish authentication using the correct method with passkey vector
         let auth_result = self.webauthn.finish_discoverable_authentication(

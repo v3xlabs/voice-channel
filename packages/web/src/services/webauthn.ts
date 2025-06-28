@@ -229,7 +229,7 @@ export class WebAuthnService {
       // CRITICAL: Empty allowCredentials array for discoverable authentication
       allowCredentials: [],
       // Prefer user verification but don't require it
-      userVerification: 'preferred',
+      userVerification: 'required',
       // 60 second timeout
       timeout: 60000,
     };

@@ -59,7 +59,7 @@ export interface WebAuthnCredential {
     userHandle?: ArrayBuffer;
   };
   type: 'public-key';
-  clientExtensionResults: {};
+  clientExtensionResults: Record<string, unknown>;
   authenticatorAttachment?: 'platform' | 'cross-platform';
 }
 
@@ -165,6 +165,7 @@ export class WebAuthnService {
     try {
       // Check if conditional mediation is available (good indicator of modern WebAuthn support)
       // Note: TypeScript may show this as always true, but it's actually optional in the spec
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const available = await (PublicKeyCredential as any).isConditionalMediationAvailable?.();
       return available === true;
     } catch {
@@ -352,6 +353,7 @@ export class WebAuthnService {
         challenge: challengeBuffer,
       },
       // Use active mediation to immediately trigger authentication popup
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       mediation: 'optional' as any,
     };
 
@@ -425,12 +427,8 @@ export class WebAuthnService {
     try {
       // Try to check if there are any credentials available
       // This is a non-standard method but works in some browsers
-      // @ts-ignore - TypeScript definitions are incomplete for WebAuthn
       const available = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable?.();
       return available === true;
-      
-      // Fallback: assume credentials might be available
-      return true;
     } catch {
       return false;
     }
@@ -450,7 +448,9 @@ export class WebAuthnService {
       userAgent: navigator.userAgent,
       platform: navigator.platform,
       webAuthnSupported: this.isSupported(),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       conditionalMediationSupported: !!(PublicKeyCredential as any).isConditionalMediationAvailable,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       platformAuthenticatorSupported: !!(PublicKeyCredential as any).isUserVerifyingPlatformAuthenticatorAvailable,
     };
   }

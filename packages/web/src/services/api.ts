@@ -2,6 +2,7 @@ import { createFetch } from 'openapi-hooks';
 import type { components, paths } from '../types/api';
 
 // The paths type needs to be extended to satisfy the Paths constraint
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type ExtendedPaths = paths & { [key: string]: any };
 
 // Token management
@@ -28,11 +29,12 @@ export const tokenManager = {
 // Create base fetch without token injection
 const baseFetch = createFetch<ExtendedPaths>({
   baseUrl: location.origin + '/api/',
-  onError: (error: any) => {
+  onError: (error: unknown) => {
     console.error('API Error:', error);
     
     // If we get a 401, clear the token
-    if (error?.status === 401) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if ((error as any)?.status === 401) {
       tokenManager.removeToken();
       // Trigger auth state update
       window.dispatchEvent(new CustomEvent('auth:logout'));

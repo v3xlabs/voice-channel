@@ -18,35 +18,38 @@ export interface WebAuthnCredentialResponse {
     userHandle?: string;
   };
   type: 'public-key';
-  clientExtensionResults: {};
+  clientExtensionResults: Record<string, never>;
   authenticatorAttachment?: 'platform' | 'cross-platform';
 }
 
 /**
  * Convert native WebAuthn credential to format expected by backend
+ * Note: Using unknown type due to complex WebAuthn type definitions
  */
-function convertCredentialForBackend(credential: any): WebAuthnCredentialResponse {
+function convertCredentialForBackend(credential: unknown): WebAuthnCredentialResponse {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const cred = credential as any;
   return {
-    id: credential.id,
-    rawId: WebAuthnUtils.bufferToBase64url(credential.rawId),
+    id: cred.id,
+    rawId: WebAuthnUtils.bufferToBase64url(cred.rawId),
     response: {
-      clientDataJSON: WebAuthnUtils.bufferToBase64url(credential.response.clientDataJSON),
-      attestationObject: credential.response.attestationObject 
-        ? WebAuthnUtils.bufferToBase64url(credential.response.attestationObject)
+      clientDataJSON: WebAuthnUtils.bufferToBase64url(cred.response.clientDataJSON),
+      attestationObject: cred.response.attestationObject 
+        ? WebAuthnUtils.bufferToBase64url(cred.response.attestationObject)
         : undefined,
-      authenticatorData: credential.response.authenticatorData
-        ? WebAuthnUtils.bufferToBase64url(credential.response.authenticatorData)
+      authenticatorData: cred.response.authenticatorData
+        ? WebAuthnUtils.bufferToBase64url(cred.response.authenticatorData)
         : undefined,
-      signature: credential.response.signature
-        ? WebAuthnUtils.bufferToBase64url(credential.response.signature)
+      signature: cred.response.signature
+        ? WebAuthnUtils.bufferToBase64url(cred.response.signature)
         : undefined,
-      userHandle: credential.response.userHandle
-        ? WebAuthnUtils.bufferToBase64url(credential.response.userHandle)
+      userHandle: cred.response.userHandle
+        ? WebAuthnUtils.bufferToBase64url(cred.response.userHandle)
         : undefined,
     },
-    type: credential.type,
-    clientExtensionResults: credential.clientExtensionResults || {},
-    authenticatorAttachment: credential.authenticatorAttachment,
+    type: 'public-key',
+    clientExtensionResults: {},
+    authenticatorAttachment: cred.authenticatorAttachment as 'platform' | 'cross-platform' | undefined,
   };
 }
 
@@ -72,9 +75,11 @@ export const useWebAuthnRegistration = () => {
       const { challenge_id, options } = beginResponse.data;
       
       // Extract challenge and other options from server response
-      const serverOptions = (options as any).publicKey || options;
-      const challenge = serverOptions.challenge;
-      const user = serverOptions.user;
+      const serverOptions = (options as Record<string, unknown>).publicKey || options;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const typedOptions = serverOptions as any;
+      const challenge = typedOptions.challenge;
+      const user = typedOptions.user;
 
       if (!challenge || !user) {
         throw new Error('Invalid registration options from server');
@@ -148,8 +153,10 @@ export const useWebAuthnAuthentication = () => {
       const { challenge_id, options } = beginResponse.data;
       
       // Extract challenge from server response
-      const serverOptions = (options as any).publicKey || options;
-      const challenge = serverOptions.challenge;
+      const serverOptions = (options as Record<string, unknown>).publicKey || options;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const typedOptions = serverOptions as any;
+      const challenge = typedOptions.challenge;
 
       if (!challenge) {
         throw new Error('Invalid authentication options from server');

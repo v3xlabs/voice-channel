@@ -12,7 +12,10 @@ export default [
     files: ['**/*.{ts,tsx}'],
     languageOptions: {
       ecmaVersion: 2020,
-      globals: globals.browser,
+      globals: {
+        ...globals.browser,
+        React: 'readonly',
+      },
       parser: tsParser,
       parserOptions: {
         ecmaVersion: 2020,
@@ -46,6 +49,7 @@ export default [
       ],
       'react/react-in-jsx-scope': 'off', // Not needed in React 17+
       'react/jsx-uses-react': 'off', // Not needed in React 17+
+      'no-undef': ['error', { typeof: true }],
     },
   },
 ] 

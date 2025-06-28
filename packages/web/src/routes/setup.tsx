@@ -41,7 +41,7 @@ const SetupPage: FC = () => {
     };
 
     checkSetupStatus();
-  }, []);
+  }, [navigate]);
 
   const handleCreateAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -158,7 +158,7 @@ const SetupPage: FC = () => {
             </div>
             <h2 className="text-2xl font-bold text-white mb-4">Setup Complete!</h2>
             <p className="text-gray-400 mb-4">
-              Your admin account has been created successfully. You'll be redirected to the homepage shortly.
+              Your admin account has been created successfully. You&apos;ll be redirected to the homepage shortly.
             </p>
             <p className="text-sm text-blue-300">
               You can now manage your instance from the admin panel.

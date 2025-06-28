@@ -92,7 +92,7 @@ export const PasskeyLoginForm: FC<PasskeyLoginFormProps> = ({ className }) => {
             </div>
             <h2 className="text-2xl font-bold text-white mb-4">Passkeys Not Supported</h2>
             <p className="text-gray-400 mb-6">
-              Your browser or device doesn't support passkeys. Please try:
+              Your browser or device doesn&apos;t support passkeys. Please try:
             </p>
             <ul className="text-left text-gray-400 text-sm space-y-2 mb-6">
               <li>• Updating your browser to the latest version</li>

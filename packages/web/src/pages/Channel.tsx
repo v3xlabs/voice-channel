@@ -8,7 +8,7 @@ export const Channel: React.FC = () => {
   const navigate = useNavigate()
   const params = useParams({ strict: false })
   const { channelName, instanceFqdn } = params
-  const groupName = (params as any).groupName // TODO: Update when route tree is regenerated
+  const groupName = (params as Record<string, unknown>).groupName as string | undefined // TODO: Update when route tree is regenerated
   const localVideoRef = useRef<HTMLVideoElement>(null)
   const { user, isAuthenticated } = useUser()
 
@@ -197,7 +197,7 @@ export const Channel: React.FC = () => {
                     </p>
                     <div className="bg-blue-600/10 border border-blue-600/20 rounded-lg p-4 max-w-md mx-auto">
                       <p className="text-blue-300 text-sm">
-                        💡 Click "Join Call" in the header to start a voice/video conversation with others in this channel.
+                        💡 Click &quot;Join Call&quot; in the header to start a voice/video conversation with others in this channel.
                       </p>
                     </div>
                   </div>

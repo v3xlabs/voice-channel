@@ -60,7 +60,7 @@ export const Home: React.FC = () => {
       {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-white">Voice Channels</h1>
+          <h1 className="text-3xl font-bold text-white">Channels</h1>
           <p className="text-gray-400 mt-2">Join or create voice channels to communicate with others</p>
         </div>
         <button

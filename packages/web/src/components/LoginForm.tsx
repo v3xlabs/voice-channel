@@ -80,7 +80,7 @@ export const LoginForm: FC<LoginFormProps> = ({ onLoginSuccess }) => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
             </svg>
           </div>
-          <h2 className="text-3xl font-bold text-white mb-2">Voice Channel</h2>
+          <h2 className="text-3xl font-bold text-white mb-2">voice<span className="text-yellow-400">.</span>channel</h2>
           <p className="text-gray-400">Join voice channels and start talking with others</p>
         </div>
 

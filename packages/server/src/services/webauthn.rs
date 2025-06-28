@@ -35,7 +35,7 @@ impl WebAuthnService {
             .map_err(|e| anyhow!("Failed to create WebAuthn builder: {}", e))?;
         
         let webauthn = builder
-            .rp_name("Voice Channel")
+            .rp_name(rp_id)
             .build()
             .map_err(|e| anyhow!("Failed to build WebAuthn service: {}", e))?;
 

@@ -228,8 +228,8 @@ export class WebAuthnService {
       rpId: this.rpId,
       // CRITICAL: Empty allowCredentials array for discoverable authentication
       allowCredentials: [],
-      // Require user verification
-      userVerification: 'required',
+      // Prefer user verification but don't require it
+      userVerification: 'preferred',
       // 60 second timeout
       timeout: 60000,
     };
@@ -331,7 +331,7 @@ export class WebAuthnService {
   }
 
   /**
-   * Authenticate using discoverable credentials (resident keys)
+   * Authenticate using discoverable credentials (resident keys) for active authentication
    */
   async authenticate(challenge: string): Promise<WebAuthnCredential> {
     if (!this.isSupported()) {
@@ -351,8 +351,8 @@ export class WebAuthnService {
         ...this.createAuthenticationOptions(challenge),
         challenge: challengeBuffer,
       },
-      // Enable conditional mediation if available (allows autofill)
-      mediation: 'conditional' as any,
+      // Use active mediation to immediately trigger authentication popup
+      mediation: 'optional' as any,
     };
 
     console.log('🔧 Authentication options:', {

@@ -24,6 +24,22 @@ use services::mediasoup_service::MediasoupService;
 use services::participant_service::ParticipantService;
 use services::webauthn::WebAuthnService;
 
+/// Determine WebAuthn origin and RP ID based on instance FQDN
+fn determine_webauthn_config(instance_fqdn: &str) -> (String, String) {
+    if instance_fqdn == "localhost" || instance_fqdn.starts_with("localhost:") {
+        // Development environment - frontend runs on port 5173
+        ("http://localhost:5173".to_string(), "localhost".to_string())
+    } else if instance_fqdn.contains("localhost") {
+        // Edge case: localhost with different format
+        ("http://localhost:5173".to_string(), "localhost".to_string())
+    } else {
+        // Production environment - use HTTPS and the actual FQDN
+        let origin = format!("https://{}", instance_fqdn);
+        let rp_id = instance_fqdn.to_string();
+        (origin, rp_id)
+    }
+}
+
 #[derive(Clone)]
 pub struct AppState {
     pub db: Database,
@@ -56,15 +72,19 @@ async fn main() -> Result<()> {
     // Initialize participant service
     let participants = Arc::new(ParticipantService::new());
 
-    // Initialize WebAuthn service
-    // Use frontend origin for WebAuthn (where the user actually interacts)
-    let webauthn_origin = format!("http://localhost:5173");
-    let webauthn_rp_id = "localhost";
+    // Initialize WebAuthn service with environment-based configuration
+    let (webauthn_origin, webauthn_rp_id) = determine_webauthn_config(&config.instance_fqdn);
+    info!("WebAuthn configuration: origin={}, rp_id={}", webauthn_origin, webauthn_rp_id);
+    
     let webauthn = Arc::new(WebAuthnService::new(
         &webauthn_origin,
-        webauthn_rp_id,
+        &webauthn_rp_id,
         config.instance_fqdn.clone(),
     )?);
+
+    // Validate WebAuthn configuration
+    webauthn.validate_config()?;
+    info!("WebAuthn service configuration validated successfully");
 
     // Create shared application state
     let state = Arc::new(AppState { 

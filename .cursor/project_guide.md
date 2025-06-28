@@ -77,8 +77,8 @@ Instances can be scaled horizontally by running multiple worker processes.
 
 ### Authentication
 
--   **Primary Method**: Passwordless authentication using **Passkeys** (WebAuthn).
--   **Resident Keys**: Encouraged for a seamless login experience, allowing users to sign in without entering a username.
+-   **Authentication Method**: The only supported method is passwordless authentication using **Passkeys** with **Resident Keys (Discoverable Credentials)**.
+-   **Why Resident Keys?**: This requirement ensures the highest level of security and provides a seamless, "username-less" login experience. Users authenticate directly with their device, as the key itself contains their identifier.
 
 ### Account Creation & Onboarding
 

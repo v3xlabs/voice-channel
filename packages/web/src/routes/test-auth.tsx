@@ -205,4 +205,4 @@ const TestAuthPage: FC = () => {
 
 export const Route = createFileRoute('/test-auth')({
   component: TestAuthPage,
-}); 
+});

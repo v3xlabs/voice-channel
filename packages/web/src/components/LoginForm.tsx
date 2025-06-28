@@ -1,4 +1,4 @@
-import { FC, useState } from 'react';
+import { FC, useState, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 
 interface LoginFormProps {
@@ -7,18 +7,40 @@ interface LoginFormProps {
 
 export const LoginForm: FC<LoginFormProps> = ({ onLoginSuccess }) => {
   const { 
-    createAccount, 
-    isCreatingAccount,
+    register, 
+    isRegistering,
+    registerError,
     login, 
-    isLoggingIn
+    isLoggingIn,
+    loginError,
+    isAuthenticated
   } = useAuth();
   
   const [displayName, setDisplayName] = useState('');
   const [inviteCode, setInviteCode] = useState('');
   const [showInviteCode, setShowInviteCode] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showCreateAccount, setShowCreateAccount] = useState(false);
 
-  const isLoading = isCreatingAccount || isLoggingIn;
+  const isLoading = isRegistering || isLoggingIn;
+
+  // Handle successful authentication
+  useEffect(() => {
+    if (isAuthenticated) {
+      onLoginSuccess?.();
+    }
+  }, [isAuthenticated, onLoginSuccess]);
+
+  // Handle errors from mutations
+  useEffect(() => {
+    if (registerError) {
+      setError('Failed to create account. Please try again.');
+    } else if (loginError) {
+      setError('Authentication failed. This might happen if you don\'t have any passkeys registered on this device.');
+    } else {
+      setError(null);
+    }
+  }, [registerError, loginError]);
 
   const handleCreateAccount = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,47 +51,14 @@ export const LoginForm: FC<LoginFormProps> = ({ onLoginSuccess }) => {
     }
 
     setError(null);
-
-    try {
-      const invite = inviteCode.trim() || undefined;
-      createAccount(
-        { displayName: displayName.trim(), inviteCode: invite },
-        {
-          onSuccess: () => {
-            onLoginSuccess?.();
-          },
-          onError: (error) => {
-            console.error('Failed to create account:', error);
-            setError('Failed to create account. Please try again.');
-          }
-        }
-      );
-    } catch (error) {
-      console.error('Failed to create account:', error);
-      setError('Failed to create account. Please try again.');
-    }
+    const invite = inviteCode.trim() || undefined;
+    register({ displayName: displayName.trim(), inviteCode: invite });
   };
 
   const handleLogin = async () => {
     setError(null);
-
-    try {
-      login(undefined, {
-        onSuccess: () => {
-          onLoginSuccess?.();
-        },
-        onError: (error) => {
-          console.error('Failed to login:', error);
-          setError('Authentication failed. This might happen if you don\'t have any passkeys registered on this device.');
-        }
-      });
-    } catch (error) {
-      console.error('Failed to login:', error);
-      setError('Authentication failed. Please try again or create a new account.');
-    }
+    login();
   };
-
-  const [showCreateAccount, setShowCreateAccount] = useState(false);
 
   return (
     <div className="min-h-screen bg-gray-900 flex items-center justify-center px-4">
@@ -97,7 +86,7 @@ export const LoginForm: FC<LoginFormProps> = ({ onLoginSuccess }) => {
                 disabled={isLoading}
                 className="w-full flex items-center justify-center px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isLoading ? (
+                {isLoggingIn ? (
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                 ) : (
                   <>
@@ -194,7 +183,7 @@ export const LoginForm: FC<LoginFormProps> = ({ onLoginSuccess }) => {
                 disabled={isLoading || !displayName.trim()}
                 className="w-full flex items-center justify-center px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isLoading ? (
+                {isRegistering ? (
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                 ) : (
                   <>

@@ -3,9 +3,11 @@ import { User, Settings as SettingsIcon, LogOut, Shield } from 'lucide-react';
 import { Link } from '@tanstack/react-router';
 import classnames from 'classnames';
 import { useUser } from '../hooks/useUser';
+import { useAuth } from '../hooks/useAuth';
 
 export const Settings: FC = () => {
-  const { user, isLoading, updateUser, isUpdatingUser, logout } = useUser();
+  const { user, isLoading, updateUser, isUpdatingUser } = useUser();
+  const { logout } = useAuth();
   const [displayName, setDisplayName] = useState('');
   const [saveMessage, setSaveMessage] = useState('');
 
@@ -22,8 +24,7 @@ export const Settings: FC = () => {
 
     try {
       updateUser({
-        userId: user.id,
-        updates: { display_name: displayName.trim() }
+        display_name: displayName.trim()
       });
       
       setSaveMessage('Profile updated successfully!');

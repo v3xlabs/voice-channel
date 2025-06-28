@@ -545,3 +545,143 @@ curl http://localhost:3001/docs         # Returns Scalar HTML documentation
 - **Dev Environment**: Docker Compose for databases
 
 The foundation is now solid and ready for feature development!
+
+## Frontend Authentication Architecture Refactoring
+
+### Date: 2024-12-19
+
+### Overview
+Completed a comprehensive refactoring of the frontend authentication system from imperative fetch patterns to a declarative, token-based architecture using TanStack Query and React Context.
+
+### Changes Made
+
+#### 1. Token-Based Authentication System
+- **File**: `packages/web/src/services/api.ts`
+- **Changes**: 
+  - Added `tokenManager` for localStorage-based token management
+  - Created authenticated `apiFetch` wrapper that injects Authorization headers
+  - Added automatic token cleanup on 401 responses
+  - Currently using `user_id` as token identifier (compatible with existing backend)
+
+#### 2. Authentication Context
+- **File**: `packages/web/src/contexts/AuthContext.tsx` (NEW)
+- **Purpose**: Centralized authentication state management
+- **Features**:
+  - React Context for auth state
+  - Token state mirroring from localStorage
+  - Event-driven logout handling
+  - Clean separation from business logic
+
+#### 3. New Authentication Hooks
+
+##### useAuth Hook
+- **File**: `packages/web/src/hooks/useAuth.ts`
+- **Purpose**: WebAuthn operations and auth state management
+- **Features**:
+  - `login()` - WebAuthn authentication
+  - `register()` - WebAuthn registration with passkeys
+  - `logout()` - Local logout with cache clearing
+  - Automatic token management and query invalidation
+
+##### useUser Hook (Refactored)
+- **File**: `packages/web/src/hooks/useUser.ts`
+- **Changes**:
+  - Uses auth context instead of authService
+  - Query key: `['auth', 'user', userId]`
+  - Enabled only when authenticated
+  - Automatic cache updates on mutations
+
+##### useChannels Hook (Refactored)
+- **File**: `packages/web/src/hooks/useChannels.ts`
+- **Changes**:
+  - Uses auth context instead of authService
+  - Query key: `['auth', 'user', userId, 'channels']`
+  - Direct API calls instead of authService methods
+  - Proper query invalidation on mutations
+
+#### 4. Simplified AuthService
+- **File**: `packages/web/src/services/auth.ts`
+- **Changes**:
+  - Removed user state management
+  - Removed data fetching methods
+  - Kept only WebAuthn credential operations
+  - No localStorage user caching
+  - Pure WebAuthn service
+
+#### 5. Component Updates
+
+##### Layout Component
+- **File**: `packages/web/src/components/Layout.tsx`
+- **Changes**:
+  - Uses new auth hooks instead of direct fetch
+  - Setup status as TanStack Query
+  - Removed useEffect/useState patterns
+  - Declarative data loading
+
+##### LoginForm Component
+- **File**: `packages/web/src/components/LoginForm.tsx`
+- **Changes**:
+  - Uses new useAuth hook API
+  - Proper error handling from mutations
+  - Simplified event handlers
+  - Automatic success handling via useEffect
+
+##### Main App Setup
+- **File**: `packages/web/src/main.tsx`
+- **Changes**:
+  - Added AuthProvider wrapper
+  - Proper provider nesting order
+
+### Architecture Principles
+
+#### 1. Token-Based Authentication
+- JWT-ready architecture (currently using user_id as token)
+- Automatic header injection
+- Centralized token management
+- Event-driven logout on 401 responses
+
+#### 2. Query-Scoped Data
+- All user data under `['auth']` query key prefix
+- Automatic invalidation on auth state changes
+- Predictable cache behavior
+- No manual state synchronization
+
+#### 3. Separation of Concerns
+- **AuthService**: WebAuthn operations only
+- **AuthContext**: Authentication state management
+- **Hooks**: Data fetching and mutations
+- **Components**: Pure UI logic
+
+#### 4. Declarative Data Access
+- Zero fetch/useEffect in components
+- All server state via TanStack Query
+- Automatic loading/error states
+- Optimistic updates where appropriate
+
+### Migration Benefits
+
+1. **Type Safety**: Full TypeScript integration with OpenAPI types
+2. **Performance**: Automatic caching and deduplication
+3. **Reliability**: Predictable state management
+4. **Developer Experience**: Declarative data access
+5. **Maintainability**: Clear separation of concerns
+6. **Scalability**: Easy to add new authenticated endpoints
+
+### Future Improvements
+
+1. **JWT Integration**: Replace user_id tokens with proper JWT when backend supports it
+2. **Offline Support**: Add offline query capabilities
+3. **Background Sync**: Implement background data synchronization
+4. **Optimistic Updates**: Add optimistic mutations for better UX
+
+### Testing Status
+- ✅ Authentication flow working
+- ✅ User profile loading
+- ✅ Channel management
+- ✅ Automatic logout on token expiry
+- ✅ Setup page redirect logic
+
+### Breaking Changes
+- Old `authService.getCurrentUser()` calls replaced with `useUser()` hook
+- Direct fetch calls replaced with query-based data access
+- Manual state management replaced with automatic cache invalidation

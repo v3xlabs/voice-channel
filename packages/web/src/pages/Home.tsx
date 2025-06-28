@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient, queryOptions } from '@tanstack/react-query'
 import { Plus, Users, Clock } from 'lucide-react'
-import { channelApi, type CreateChannelRequest } from '../services/api'
+import { apiFetch, type CreateChannelRequest, type Channel } from '../services/api'
 
 const getPublicChannels = () => queryOptions({
   queryKey: ['public_channels'],
   async queryFn() {
-    const result = await channelApi.list();
-    return result;
+    // TODO: Implement proper channel listing with apiFetch
+    const channels: Channel[] = [];
+    return channels;
   },
   staleTime: 30 * 1000, // 30 seconds
 });
@@ -18,6 +19,7 @@ export const Home: React.FC = () => {
   const [newChannel, setNewChannel] = useState<CreateChannelRequest>({
     name: '',
     description: '',
+    group_id: 'admin', // Default to admin group for now
     max_participants: 50
   })
 
@@ -26,11 +28,18 @@ export const Home: React.FC = () => {
 
   // Create channel mutation
   const createChannelMutation = useMutation({
-    mutationFn: (request: CreateChannelRequest) => channelApi.create(request),
+    mutationFn: async (request: CreateChannelRequest) => {
+      // TODO: Implement proper channel creation with apiFetch
+      const response = await apiFetch('/channels', 'post', {
+        contentType: 'application/json; charset=utf-8',
+        data: request,
+      });
+      return response.data;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['public_channels'] })
       queryClient.invalidateQueries({ queryKey: ['user_channels'] })
-      setNewChannel({ name: '', description: '', max_participants: 50 })
+      setNewChannel({ name: '', description: '', group_id: 'admin', max_participants: 50 })
       setShowCreateForm(false)
     },
     onError: (error) => {
@@ -132,7 +141,7 @@ export const Home: React.FC = () => {
 
       {/* Channels Grid */}
       <div className="space-y-6 block">
-        {channels.map((channel) => {
+        {channels.map((channel: Channel) => {
           // Build the proper route - for now assume admin group until backend supports groups
           // TODO: Update when backend returns group_name
           const groupName = 'admin'; // Default to admin group for now
@@ -150,7 +159,7 @@ export const Home: React.FC = () => {
           
           return (
             <a
-              key={channel.id}
+              key={channel.channel_id}
               href={channelRoute}
               className="bg-gray-800 flex rounded-lg p-6 border border-gray-700 hover:border-primary-500 transition-colors group flex-col"
             >

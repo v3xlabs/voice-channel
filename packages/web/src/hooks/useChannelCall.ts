@@ -26,7 +26,7 @@ export const useChannelCall = ({ channelName }: UseChannelCallProps) => {
     toggleVideo,
   } = useWebRTC({
     channelId: channelName,
-    userId: user?.id || '',
+    userId: user?.user_id || '',
     displayName: user?.display_name || '',
   });
 

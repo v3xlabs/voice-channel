@@ -1,17 +1,22 @@
 import { useQuery, useMutation, useQueryClient, queryOptions } from '@tanstack/react-query';
-import { authService, type UpdateUserRequest } from '../services/auth';
+import { useAuthContext } from '../contexts/AuthContext';
+import { apiFetch } from '../services/api';
+import type { User, UpdateUserRequest } from '../services/auth';
 
-const getCurrentUser = () => queryOptions({
-  queryKey: ['current_user'],
+const getUserProfile = (userId: string) => queryOptions({
+  queryKey: ['auth', 'user', userId],
   async queryFn() {
-    const currentUser = authService.getCurrentUser();
-    return currentUser;
+    const response = await apiFetch('/users/{user_id}', 'get', {
+      path: { user_id: userId },
+    });
+    return response.data as User;
   },
   staleTime: 5 * 60 * 1000, // 5 minutes
   retry: false,
 });
 
 export const useUser = () => {
+  const { isAuthenticated, token: userId } = useAuthContext();
   const queryClient = useQueryClient();
 
   const {
@@ -19,38 +24,30 @@ export const useUser = () => {
     isLoading,
     error,
     refetch,
-  } = useQuery(getCurrentUser());
-
-  const updateUserMutation = useMutation({
-    mutationFn: async (data: { userId: string; updates: UpdateUserRequest }) => {
-      // TODO: Implement actual API call when backend is ready
-      // return authService.updateUser(data.userId, data.updates);
-      
-      // For now, update local state
-      const currentUser = authService.getCurrentUser();
-      if (currentUser) {
-        const updatedUser = {
-          ...currentUser,
-          ...data.updates,
-        };
-        // Update localStorage or session storage if that's where the user is stored
-        localStorage.setItem('user', JSON.stringify(updatedUser));
-        return updatedUser;
-      }
-      throw new Error('No user found');
-    },
-    onSuccess: (updatedUser) => {
-      queryClient.setQueryData(['current_user'], updatedUser);
-    },
+  } = useQuery({
+    ...getUserProfile(userId || ''),
+    enabled: isAuthenticated && !!userId,
   });
 
-  const logoutMutation = useMutation({
-    mutationFn: async () => {
-      authService.logout();
+  const updateUserMutation = useMutation({
+    mutationFn: async (updates: UpdateUserRequest) => {
+      if (!userId) {
+        throw new Error('No user logged in');
+      }
+      
+      const response = await apiFetch('/users/{user_id}', 'patch', {
+        path: { user_id: userId },
+        contentType: 'application/json; charset=utf-8',
+        data: updates,
+      });
+      
+      return response.data as User;
     },
-    onSuccess: () => {
-      queryClient.setQueryData(['current_user'], null);
-      queryClient.clear(); // Clear all queries on logout
+    onSuccess: (updatedUser) => {
+      // Update the user query cache
+      if (userId) {
+        queryClient.setQueryData(['auth', 'user', userId], updatedUser);
+      }
     },
   });
 
@@ -58,13 +55,11 @@ export const useUser = () => {
     user,
     isLoading,
     error,
-    isAuthenticated: !!user,
+    isAuthenticated,
     isAdmin: user?.is_admin || false,
     refetch,
     updateUser: updateUserMutation.mutate,
     isUpdatingUser: updateUserMutation.isPending,
     updateUserError: updateUserMutation.error,
-    logout: logoutMutation.mutate,
-    isLoggingOut: logoutMutation.isPending,
   };
 }; 

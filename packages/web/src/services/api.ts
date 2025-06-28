@@ -4,53 +4,82 @@ import type { paths } from '../types/api';
 // The paths type needs to be extended to satisfy the Paths constraint
 type ExtendedPaths = paths & { [key: string]: any };
 
-export const apiFetch = createFetch<ExtendedPaths>({
-  baseUrl: location.origin + '/api/',  // Include /api in base URL
+// Token management
+const TOKEN_KEY = 'voice-channel-token';
+
+export const tokenManager = {
+  getToken(): string | null {
+    return localStorage.getItem(TOKEN_KEY);
+  },
+
+  setToken(token: string): void {
+    localStorage.setItem(TOKEN_KEY, token);
+  },
+
+  removeToken(): void {
+    localStorage.removeItem(TOKEN_KEY);
+  },
+
+  isAuthenticated(): boolean {
+    return !!this.getToken();
+  }
+};
+
+// Create base fetch without token injection
+const baseFetch = createFetch<ExtendedPaths>({
+  baseUrl: location.origin + '/api/',
   onError: (error: any) => {
     console.error('API Error:', error);
+    
+    // If we get a 401, clear the token
+    if (error?.status === 401) {
+      tokenManager.removeToken();
+      // Trigger auth state update
+      window.dispatchEvent(new CustomEvent('auth:logout'));
+    }
   },
 });
 
-// Channel API methods using openapi-hooks
-export const channelApi = {
-  async list() {
-    const response = await apiFetch('/channels', 'get', {});
-    return response.data;
-  },
+// Create authenticated wrapper
+export const apiFetch: typeof baseFetch = (path, method, options) => {
+  const token = tokenManager.getToken();
+  
+  // Inject Authorization header if token exists
+  if (token) {
+    const enhancedOptions = {
+      ...options,
+      fetchOptions: {
+        ...options?.fetchOptions,
+        headers: {
+          ...options?.fetchOptions?.headers,
+          'Authorization': `Bearer ${token}`,
+        },
+      },
+    };
+    return baseFetch(path, method, enhancedOptions);
+  }
 
-  async create(request: CreateChannelRequest) {
-    const response = await apiFetch('/channels', 'post', {
-      contentType: 'application/json; charset=utf-8',
-      data: request,
-    });
-    return response.data;
-  },
-
-  async getById(id: string) {
-    const response = await apiFetch('/channels/{id}', 'get', {
-      path: { id },
-    });
-    return response.data;
-  },
+  return baseFetch(path, method, options);
 };
 
 // Export types for convenience
 export type { paths };
-export type { components } from '../types/api';
 
 // Define types that the frontend expects
 export interface Channel {
-  id: string;
+  channel_id: string;
   name: string;
-  description: string;
+  description?: string;
   max_participants: number;
   current_participants: number;
   created_at: string;
   instance_fqdn: string;
+  group_id: string;
 }
 
 export interface CreateChannelRequest {
   name: string;
   description: string;
-  max_participants: number;
+  group_id: string;
+  max_participants?: number;
 } 

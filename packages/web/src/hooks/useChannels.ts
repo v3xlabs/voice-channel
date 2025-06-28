@@ -1,19 +1,21 @@
 import { useQuery, useMutation, useQueryClient, queryOptions } from '@tanstack/react-query';
-import { authService } from '../services/auth';
-import { useUser } from './useUser';
+import { useAuthContext } from '../contexts/AuthContext';
+import { apiFetch } from '../services/api';
+import type { ChannelMembership, ChannelMembershipWithChannel } from '../services/auth';
 
-const getUserChannels = (userId?: string) => queryOptions({
-  queryKey: ['user_channels', userId],
+const getUserChannels = (userId: string) => queryOptions({
+  queryKey: ['auth', 'user', userId, 'channels'],
   async queryFn() {
-    const result = await authService.getUserChannels();
-    return result;
+    const response = await apiFetch('/users/{user_id}/channels', 'get', {
+      path: { user_id: userId },
+    });
+    return response.data as ChannelMembershipWithChannel[];
   },
-  enabled: !!userId,
   staleTime: 2 * 60 * 1000, // 2 minutes
 });
 
 export const useChannels = () => {
-  const { user } = useUser();
+  const { isAuthenticated, token: userId } = useAuthContext();
   const queryClient = useQueryClient();
 
   const {
@@ -21,25 +23,54 @@ export const useChannels = () => {
     isLoading,
     error,
     refetch,
-  } = useQuery(getUserChannels(user?.id));
+  } = useQuery({
+    ...getUserChannels(userId || ''),
+    enabled: isAuthenticated && !!userId,
+  });
 
   const joinChannelMutation = useMutation({
     mutationFn: async (data: { instanceFqdn: string; channelName: string }) => {
-      return authService.joinChannel(data.instanceFqdn, data.channelName);
+      if (!userId) {
+        throw new Error('No user logged in');
+      }
+      
+      const response = await apiFetch('/channels/{channel_instance_fqdn}/{channel_name}/members', 'post', {
+        path: { 
+          channel_instance_fqdn: data.instanceFqdn,
+          channel_name: data.channelName,
+        },
+        query: { user_id: userId },
+      });
+      
+      return response.data as ChannelMembership;
     },
     onSuccess: () => {
       // Refetch channels list after joining
-      queryClient.invalidateQueries({ queryKey: ['user_channels', user?.id] });
+      if (userId) {
+        queryClient.invalidateQueries({ queryKey: ['auth', 'user', userId, 'channels'] });
+      }
     },
   });
 
   const leaveChannelMutation = useMutation({
     mutationFn: async (data: { instanceFqdn: string; channelName: string }) => {
-      return authService.leaveChannel(data.instanceFqdn, data.channelName);
+      if (!userId) {
+        throw new Error('No user logged in');
+      }
+      
+      await apiFetch('/channels/{channel_instance_fqdn}/{channel_name}/members/{user_id}', 'delete', {
+        path: { 
+          channel_instance_fqdn: data.instanceFqdn,
+          channel_name: data.channelName,
+          user_id: userId,
+        },
+      });
     },
     onSuccess: () => {
       // Refetch channels list after leaving
-      queryClient.invalidateQueries({ queryKey: ['user_channels', user?.id] });
+      if (userId) {
+        queryClient.invalidateQueries({ queryKey: ['auth', 'user', userId, 'channels'] });
+      }
     },
   });
 

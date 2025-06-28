@@ -1,22 +1,21 @@
-import { Device } from 'mediasoup-client';
-import { apiFetch } from './api';
-
 export interface Participant {
   id: string;
-  userId: string;
   displayName: string;
-  isAudioEnabled: boolean;
-  isVideoEnabled: boolean;
+  isLocal: boolean;
+  audioEnabled: boolean;
+  videoEnabled: boolean;
+  videoStream?: MediaStream;
 }
 
 export class WebRTCService {
-  private device?: Device;
-  private sendTransport?: any;
-  private recvTransport?: any;
-  private producers: Map<string, any> = new Map();
-  private consumers: Map<string, any> = new Map();
+  private socket?: WebSocket;
+  private localStream?: MediaStream;
+  private peerConnections: Map<string, RTCPeerConnection> = new Map();
   private localParticipant?: Participant;
-  private channelId?: string;
+
+  constructor() {
+    // Initialize WebRTC service
+  }
 
   async initialize(): Promise<void> {
     // Initialize any global WebRTC setup here
@@ -25,123 +24,67 @@ export class WebRTCService {
   }
 
   async joinChannel(channelId: string, userId: string, displayName: string): Promise<Participant> {
-    this.channelId = channelId;
+    // TODO: Implement WebRTC channel joining
+    console.log('Joining channel:', { channelId, userId, displayName });
+    
+    const participant: Participant = {
+      id: userId,
+      displayName,
+      isLocal: true,
+      audioEnabled: true,
+      videoEnabled: false,
+    };
 
-    try {
-      // Join channel on server using openapi-hooks
-      // Use the correct OpenAPI path format with channel_name instead of channel_id
-      const joinResponse = await apiFetch('/channels/{channel_name}/join', 'post', {
-        path: { channel_name: channelId },
-        contentType: "application/json; charset=utf-8",
-        data: { user_id: userId },
-      });
-
-      // Extract participant data from response
-      const participantData = joinResponse.data;
-      
-      this.localParticipant = {
-        id: participantData.id,
-        userId: participantData.user_id,
-        displayName: participantData.display_name,
-        isAudioEnabled: participantData.is_audio_enabled,
-        isVideoEnabled: participantData.is_video_enabled,
-      };
-
-      // Get router RTP capabilities using openapi-hooks
-      const rtpCapabilitiesResponse = await apiFetch('/channels/{channel_name}/rtp-capabilities', 'get', {
-        path: { channel_name: channelId },
-      });
-      
-      const backendRtpCapabilities = rtpCapabilitiesResponse.data;
-
-      console.log('✅ Successfully joined channel and got RTP capabilities:', {
-        participant: participantData,
-        rtpCapabilities: backendRtpCapabilities
-      });
-
-      // For now, just initialize the device with a simple capabilities object
-      // We'll implement real mediasoup integration once the API communication works
-      this.device = new Device();
-      
-      // Temporary simplified RTP capabilities for testing
-      const simpleRtpCapabilities = {
-        codecs: [
-          {
-            kind: 'audio' as const,
-            mimeType: 'audio/opus',
-            clockRate: 48000,
-            channels: 2,
-          }
-        ],
-        headerExtensions: []
-      };
-
-      await this.device.load({ routerRtpCapabilities: simpleRtpCapabilities });
-
-      console.log('✅ Device loaded successfully');
-
-      // Return the local participant
-      return this.localParticipant;
-
-    } catch (error) {
-      console.error('Failed to join channel:', error);
-      throw error;
-    }
-  }
-
-  async enableAudio(): Promise<void> {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const audioTrack = stream.getAudioTracks()[0];
-      
-      console.log('✅ Audio track obtained:', audioTrack);
-      
-      if (this.localParticipant) {
-        this.localParticipant.isAudioEnabled = true;
-      }
-    } catch (error) {
-      console.error('Failed to enable audio:', error);
-      throw error;
-    }
-  }
-
-  async enableVideo(): Promise<MediaStream> {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      const videoTrack = stream.getVideoTracks()[0];
-      
-      console.log('✅ Video track obtained:', videoTrack);
-      
-      if (this.localParticipant) {
-        this.localParticipant.isVideoEnabled = true;
-      }
-      
-      return stream;
-    } catch (error) {
-      console.error('Failed to enable video:', error);
-      throw error;
-    }
-  }
-
-  async disableAudio(): Promise<void> {
-    if (this.localParticipant) {
-      this.localParticipant.isAudioEnabled = false;
-    }
-  }
-
-  async disableVideo(): Promise<void> {
-    if (this.localParticipant) {
-      this.localParticipant.isVideoEnabled = false;
-    }
+    this.localParticipant = participant;
+    return participant;
   }
 
   async leaveChannel(): Promise<void> {
-    // Reset state
-    this.device = undefined;
-    this.sendTransport = undefined;
-    this.recvTransport = undefined;
+    // TODO: Implement WebRTC channel leaving
+    console.log('Leaving channel');
+    
+    // Clean up local stream
+    if (this.localStream) {
+      this.localStream.getTracks().forEach(track => track.stop());
+      this.localStream = undefined;
+    }
+
+    // Close peer connections
+    this.peerConnections.forEach(pc => pc.close());
+    this.peerConnections.clear();
+
+    // Close socket
+    if (this.socket) {
+      this.socket.close();
+      this.socket = undefined;
+    }
+
     this.localParticipant = undefined;
-    this.channelId = undefined;
+  }
+
+  async toggleAudio(): Promise<boolean> {
+    // TODO: Implement audio toggle
+    console.log('Toggling audio');
+    if (this.localParticipant) {
+      this.localParticipant.audioEnabled = !this.localParticipant.audioEnabled;
+      return this.localParticipant.audioEnabled;
+    }
+    return true;
+  }
+
+  async toggleVideo(): Promise<boolean> {
+    // TODO: Implement video toggle
+    console.log('Toggling video');
+    if (this.localParticipant) {
+      this.localParticipant.videoEnabled = !this.localParticipant.videoEnabled;
+      return this.localParticipant.videoEnabled;
+    }
+    return false;
+  }
+
+  async getLocalVideoStream(): Promise<MediaStream | null> {
+    // TODO: Implement local video stream
+    return null;
   }
 
   getLocalParticipant(): Participant | undefined {

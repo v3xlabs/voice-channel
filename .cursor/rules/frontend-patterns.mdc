@@ -1,0 +1,382 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Frontend Development Rules
+
+## Authentication & API Patterns
+
+### MANDATORY: Use Auth Hooks for Authentication
+❌ **Never** use `authService` directly in components
+✅ **Always** use the `useAuth()` hook
+
+```typescript
+// BAD
+import { authService } from '../services/auth';
+const user = authService.getCurrentUser();
+
+// GOOD
+import { useAuth } from '../hooks/useAuth';
+const { isAuthenticated, login, logout } = useAuth();
+```
+
+### MANDATORY: Use Custom Hooks for Server Data
+❌ **Never** use `fetch()` or `useEffect` for server data
+✅ **Always** use custom hooks that wrap TanStack Query
+
+```typescript
+// BAD
+const [user, setUser] = useState(null);
+useEffect(() => {
+  fetch('/api/user').then(res => setUser(res.data));
+}, []);
+
+// GOOD
+const { user, isLoading, error } = useUser();
+```
+
+### MANDATORY: Auth-Scoped Query Keys
+All authenticated data **must** use the `['auth']` prefix:
+
+```typescript
+// User data
+['auth', 'user', userId]
+
+// User's channels  
+['auth', 'user', userId, 'channels']
+
+// Channel-specific data
+['auth', 'channel', instanceFqdn, channelName]
+```
+
+### MANDATORY: Automatic Token Injection
+❌ **Never** manually add Authorization headers
+✅ **Always** use `apiFetch` which auto-injects tokens
+
+```typescript
+// BAD
+fetch('/api/endpoint', {
+  headers: { 'Authorization': `Bearer ${token}` }
+});
+
+// GOOD
+apiFetch('/endpoint', 'get', {});
+```
+
+## Component Patterns
+
+### MANDATORY: Declarative Data Access
+Components **must** be declarative - no imperative data fetching:
+
+```typescript
+// BAD - Imperative
+const Component = () => {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(() => {
+    fetchData().then(data => {
+      setData(data);
+      setLoading(false);
+    });
+  }, []);
+  
+  if (loading) return <Spinner />;
+  return <div>{data.name}</div>;
+};
+
+// GOOD - Declarative
+const Component = () => {
+  const { data, isLoading } = useData();
+  
+  if (isLoading) return <Spinner />;
+  return <div>{data.name}</div>;
+};
+```
+
+### MANDATORY: Handle Loading States
+Every data-fetching hook usage **must** handle loading states:
+
+```typescript
+// BAD - No loading state
+const { user } = useUser();
+return <div>{user.name}</div>; // Will crash if user is undefined
+
+// GOOD - Proper loading handling
+const { user, isLoading } = useUser();
+if (isLoading) return <Spinner />;
+return <div>{user.name}</div>;
+```
+
+### MANDATORY: Error Boundaries
+Components that could error **must** handle error states:
+
+```typescript
+const { data, isLoading, error } = useData();
+
+if (isLoading) return <Spinner />;
+if (error) return <ErrorMessage error={error} />;
+return <DataDisplay data={data} />;
+```
+
+## Mutation Patterns
+
+### MANDATORY: Use Mutations for Data Changes
+❌ **Never** use direct API calls for mutations in components
+✅ **Always** use mutation hooks
+
+```typescript
+// BAD
+const handleSave = async () => {
+  await apiFetch('/user', 'patch', { data: newData });
+  // Manual cache invalidation
+};
+
+// GOOD
+const { updateUser, isUpdating } = useUser();
+const handleSave = () => {
+  updateUser(newData); // Automatic cache invalidation
+};
+```
+
+### MANDATORY: Automatic Cache Invalidation
+Mutations **must** automatically invalidate related queries:
+
+```typescript
+const updateUserMutation = useMutation({
+  mutationFn: updateUser,
+  onSuccess: () => {
+    // REQUIRED: Invalidate related queries
+    queryClient.invalidateQueries({ queryKey: ['auth', 'user', userId] });
+  }
+});
+```
+
+## Hook Patterns
+
+### MANDATORY: Hook Naming Convention
+- Data fetching: `use{Entity}` (useUser, useChannels, useMessages)
+- Actions: `use{Action}` (useSendMessage, useUpdateProfile)
+
+### MANDATORY: Enable Guards
+Query hooks **must** use enable guards for conditional fetching:
+
+```typescript
+const { data, isLoading } = useQuery({
+  ...getQueryOptions(),
+  enabled: isAuthenticated && !!requiredParam
+});
+```
+
+### MANDATORY: Consistent Return Pattern
+Custom hooks **must** return consistent object patterns:
+
+```typescript
+// Data hooks return
+return {
+  data,           // The actual data
+  isLoading,      // Loading state
+  error,          // Error state
+  refetch         // Manual refetch function
+};
+
+// Mutation hooks return  
+return {
+  mutate,         // The mutation function
+  isPending,      // Loading state
+  error,          // Error state
+  isSuccess       // Success state
+};
+```
+
+## Type Safety Rules
+
+### MANDATORY: Use OpenAPI Types
+❌ **Never** use `any` or custom types for API data
+✅ **Always** use generated OpenAPI types
+
+```typescript
+// BAD
+const user: any = userData;
+
+// GOOD
+import type { User } from '../services/auth';
+const user: User = userData;
+```
+
+### MANDATORY: Type Hook Parameters
+All hook parameters **must** be typed:
+
+```typescript
+// BAD
+export const useChannelMessages = (channelId) => { ... }
+
+// GOOD
+export const useChannelMessages = (channelId: string) => { ... }
+```
+
+## State Management Rules
+
+### MANDATORY: Separate Server and Client State
+- **Server State**: Use TanStack Query (user data, API responses)
+- **Client State**: Use useState/useReducer (form inputs, UI state)
+
+```typescript
+// Server state - GOOD
+const { user } = useUser();
+
+// Client state - GOOD  
+const [isModalOpen, setIsModalOpen] = useState(false);
+
+// Server state in useState - BAD
+const [user, setUser] = useState(null);
+```
+
+### MANDATORY: Query Client Access
+❌ **Never** import queryClient directly in components
+✅ **Always** use useQueryClient hook
+
+```typescript
+// BAD
+import { queryClient } from '../main';
+
+// GOOD
+const queryClient = useQueryClient();
+```
+
+## Authentication Rules
+
+### MANDATORY: Context Usage
+❌ **Never** access localStorage directly for auth state
+✅ **Always** use AuthContext
+
+```typescript
+// BAD
+const token = localStorage.getItem('token');
+
+// GOOD
+const { isAuthenticated, token } = useAuthContext();
+```
+
+### MANDATORY: Logout Handling
+Logout **must** clear all queries:
+
+```typescript
+const logout = () => {
+  tokenManager.removeToken();
+  queryClient.clear(); // REQUIRED
+};
+```
+
+## Performance Rules
+
+### MANDATORY: Query Deduplication
+Multiple components using the same query **must** share cache:
+
+```typescript
+// Both components will share the same query cache
+const ComponentA = () => {
+  const { user } = useUser(); // Same query key
+  return <div>{user.name}</div>;
+};
+
+const ComponentB = () => {
+  const { user } = useUser(); // Same query key - shared cache
+  return <div>{user.email}</div>;
+};
+```
+
+### MANDATORY: Stale Time Configuration
+Queries **should** have appropriate stale times:
+
+```typescript
+const getUserData = () => queryOptions({
+  queryKey: ['auth', 'user', userId],
+  queryFn: fetchUser,
+  staleTime: 5 * 60 * 1000, // 5 minutes - GOOD for user data
+});
+```
+
+## Error Handling Rules
+
+### MANDATORY: Graceful Degradation
+Components **must** handle all error states gracefully:
+
+```typescript
+const Component = () => {
+  const { data, isLoading, error } = useData();
+  
+  if (isLoading) return <LoadingSkeleton />;
+  if (error) return <ErrorFallback error={error} />;
+  if (!data) return <EmptyState />;
+  
+  return <DataDisplay data={data} />;
+};
+```
+
+### MANDATORY: 401 Handling
+API service **must** automatically handle 401 responses:
+
+```typescript
+// Already implemented in apiFetch
+onError: (error) => {
+  if (error?.status === 401) {
+    tokenManager.removeToken();
+    window.dispatchEvent(new CustomEvent('auth:logout'));
+  }
+}
+```
+
+## Testing Rules
+
+### MANDATORY: Mock API Calls
+Tests **must** mock `apiFetch`, not individual hooks:
+
+```typescript
+// GOOD - Mock at API level
+jest.mock('../services/api', () => ({
+  apiFetch: jest.fn()
+}));
+```
+
+### MANDATORY: Provide Query Client
+Hook tests **must** provide QueryClient context:
+
+```typescript
+const createWrapper = () => {
+  const queryClient = new QueryClient();
+  return ({ children }) => (
+    <QueryClientProvider client={queryClient}>
+      {children}
+    </QueryClientProvider>
+  );
+};
+```
+
+## Migration Rules
+
+### MANDATORY: No Mixed Patterns
+When refactoring, **must** fully migrate to new patterns:
+
+```typescript
+// BAD - Mixed old and new patterns
+const { user } = useUser();
+const [channels, setChannels] = useState([]);
+useEffect(() => {
+  authService.getUserChannels().then(setChannels);
+}, []);
+
+// GOOD - Consistent new patterns
+const { user } = useUser();
+const { channels } = useChannels();
+```
+
+## Enforcement
+
+These rules are **mandatory** for all new code and **required** when refactoring existing code. Code reviews **must** enforce these patterns.
+
+Violations of these rules will result in:
+1. Code review rejection
+2. Required refactoring before merge
+3. Technical debt tracking for legacy code 

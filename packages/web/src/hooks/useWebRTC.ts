@@ -1,76 +1,44 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { webrtcService, type Participant } from '../services/webrtc';
+import { useState, useCallback } from 'react';
+import { WebRTCService, type Participant } from '../services/webrtc';
 
-export interface UseWebRTCOptions {
+interface UseWebRTCProps {
   channelId: string;
   userId: string;
   displayName: string;
 }
 
-export const useWebRTC = ({ channelId, userId, displayName }: UseWebRTCOptions) => {
+export const useWebRTC = ({ channelId, userId, displayName }: UseWebRTCProps) => {
+  const [webrtcService] = useState(() => new WebRTCService());
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [localParticipant, setLocalParticipant] = useState<Participant | null>(null);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [localVideoStream, setLocalVideoStream] = useState<MediaStream | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const initialized = useRef(false);
-
-  // Initialize WebRTC service
-  useEffect(() => {
-    if (!initialized.current) {
-      webrtcService.initialize().catch(err => {
-        console.error('Failed to initialize WebRTC service:', err);
-        setError('Failed to initialize WebRTC');
-      });
-      initialized.current = true;
-    }
-  }, []);
-
-  const handleParticipantJoined = useCallback((participant: Participant) => {
-    setParticipants(prev => [...prev, participant]);
-  }, []);
-
-  const handleParticipantLeft = useCallback((participantId: string) => {
-    setParticipants(prev => prev.filter(p => p.id !== participantId));
-  }, []);
-
-  const handleParticipantUpdated = useCallback((participant: Participant) => {
-    if (participant.id === localParticipant?.id) {
-      setLocalParticipant(participant);
-    } else {
-      setParticipants(prev => 
-        prev.map(p => p.id === participant.id ? participant : p)
-      );
-    }
-  }, [localParticipant?.id]);
+  const [error, setError] = useState<Error | null>(null);
 
   const connect = useCallback(async () => {
-    if (isConnected || isConnecting) return;
-
-    setIsConnecting(true);
-    setError(null);
+    if (isConnecting || isConnected) return;
 
     try {
-      const participant = await webrtcService.joinChannel(
-        channelId,
-        userId,
-        displayName
-      );
+      setIsConnecting(true);
+      setError(null);
 
+      const participant = await webrtcService.joinChannel(channelId, userId, displayName);
       setLocalParticipant(participant);
       setIsConnected(true);
+
+      // Get local video stream
+      const videoStream = await webrtcService.getLocalVideoStream();
+      setLocalVideoStream(videoStream);
     } catch (err) {
-      console.error('Failed to connect to channel:', err);
-      setError(err instanceof Error ? err.message : 'Failed to connect');
+      setError(err as Error);
+      console.error('Failed to connect to WebRTC:', err);
     } finally {
       setIsConnecting(false);
     }
-  }, [channelId, userId, displayName, isConnected, isConnecting]);
+  }, [channelId, userId, displayName, isConnecting, isConnected, webrtcService]);
 
   const disconnect = useCallback(async () => {
-    if (!isConnected) return;
-
     try {
       await webrtcService.leaveChannel();
       setIsConnected(false);
@@ -79,51 +47,38 @@ export const useWebRTC = ({ channelId, userId, displayName }: UseWebRTCOptions) 
       setLocalVideoStream(null);
       setError(null);
     } catch (err) {
-      console.error('Failed to disconnect:', err);
-      setError(err instanceof Error ? err.message : 'Failed to disconnect');
+      setError(err as Error);
+      console.error('Failed to disconnect from WebRTC:', err);
     }
-  }, [isConnected]);
+  }, [webrtcService]);
 
   const toggleAudio = useCallback(async () => {
-    if (!localParticipant) return;
-
     try {
-      if (localParticipant.isAudioEnabled) {
-        await webrtcService.disableAudio();
-      } else {
-        await webrtcService.enableAudio();
+      const enabled = await webrtcService.toggleAudio();
+      if (localParticipant) {
+        setLocalParticipant({ ...localParticipant, audioEnabled: enabled });
       }
     } catch (err) {
+      setError(err as Error);
       console.error('Failed to toggle audio:', err);
-      setError(err instanceof Error ? err.message : 'Failed to toggle audio');
     }
-  }, [localParticipant]);
+  }, [webrtcService, localParticipant]);
 
   const toggleVideo = useCallback(async () => {
-    if (!localParticipant) return;
-
     try {
-      if (localParticipant.isVideoEnabled) {
-        await webrtcService.disableVideo();
-        setLocalVideoStream(null);
-      } else {
-        const stream = await webrtcService.enableVideo();
-        setLocalVideoStream(stream || null);
+      const enabled = await webrtcService.toggleVideo();
+      if (localParticipant) {
+        setLocalParticipant({ ...localParticipant, videoEnabled: enabled });
       }
+      
+      // Update video stream
+      const videoStream = await webrtcService.getLocalVideoStream();
+      setLocalVideoStream(videoStream);
     } catch (err) {
+      setError(err as Error);
       console.error('Failed to toggle video:', err);
-      setError(err instanceof Error ? err.message : 'Failed to toggle video');
     }
-  }, [localParticipant]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (isConnected) {
-        webrtcService.leaveChannel().catch(console.error);
-      }
-    };
-  }, [isConnected]);
+  }, [webrtcService, localParticipant]);
 
   return {
     isConnected,

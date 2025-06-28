@@ -10,7 +10,7 @@ Write hooks as:
 export const getPostById = (post_id: string) => queryOptions({
   queryKey: ['post', '{post_id}', post_id],
   queryFn: async () => {
-    const result = await apiFetch('/post/{post_id}', { params: {post_id: post_id}});
+    const result = await apiFetch('/post/{post_id}', 'get', { params: {post_id: post_id}});
 
     return result.data;
   }

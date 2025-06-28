@@ -1,52 +1,43 @@
-import { FC, ReactNode, useEffect, useState } from 'react';
+import { FC, ReactNode } from 'react';
 import { Link } from '@tanstack/react-router';
 import { useUser } from '../hooks/useUser';
 import { useChannels } from '../hooks/useChannels';
+import { useAuth } from '../hooks/useAuth';
+import { useQuery } from '@tanstack/react-query';
 import { LoginForm } from './LoginForm';
 import type { ChannelMembershipWithChannel } from '../services/auth';
+
+// Setup status query
+const useSetupStatus = () => {
+  return useQuery({
+    queryKey: ['setup', 'status'],
+    queryFn: async () => {
+      const response = await fetch('/setup/status');
+      const data = await response.json();
+      return data as { setup_required: boolean };
+    },
+    retry: false,
+    staleTime: 30 * 1000, // 30 seconds
+  });
+};
 
 interface LayoutProps {
   children: ReactNode;
 }
 
 export const Layout: FC<LayoutProps> = ({ children }) => {
-  const { user, isLoading: userLoading, isAuthenticated } = useUser();
-  const { 
-    channels, 
-    isLoading: channelsLoading, 
-    leaveChannel 
-  } = useChannels();
-  const [setupRequired, setSetupRequired] = useState<boolean | null>(null);
+  const { isAuthenticated } = useAuth();
+  const { user, isLoading: userLoading } = useUser();
+  const { channels, isLoading: channelsLoading, leaveChannel } = useChannels();
+  const { data: setupStatus, isLoading: setupLoading } = useSetupStatus();
 
-  const isLoading = userLoading || (isAuthenticated && channelsLoading);
+  const isLoading = userLoading || (isAuthenticated && channelsLoading) || setupLoading;
 
-  // Check if setup is required (zero users)
-  useEffect(() => {
-    const checkSetupStatus = async () => {
-      try {
-        const response = await fetch('/setup/status');
-        const data = await response.json();
-        setSetupRequired(data.setup_required);
-        
-        // If setup is required, redirect to setup page
-        if (data.setup_required) {
-          window.location.href = '/setup';
-        }
-      } catch (error) {
-        console.error('Failed to check setup status:', error);
-        // If we can't check setup status, assume no setup needed
-        setSetupRequired(false);
-      }
-    };
-
-    // Only check setup status if we're not authenticated
-    // (authenticated means someone already exists)
-    if (!isAuthenticated && !userLoading) {
-      checkSetupStatus();
-    } else {
-      setSetupRequired(false);
-    }
-  }, [isAuthenticated, userLoading]);
+  // If setup is required, redirect to setup page
+  if (setupStatus?.setup_required && !isAuthenticated) {
+    window.location.href = '/setup';
+    return null;
+  }
 
   if (isLoading) {
     return (

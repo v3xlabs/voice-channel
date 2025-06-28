@@ -127,7 +127,7 @@ export const Channel: React.FC = () => {
                     key={participant.id}
                     className="aspect-video bg-gray-800 rounded-lg flex items-center justify-center border border-gray-700 relative overflow-hidden"
                   >
-                    {participant.id === localParticipant?.id && participant.isVideoEnabled ? (
+                    {participant.id === localParticipant?.id && participant.videoEnabled ? (
                       <video
                         ref={localVideoRef}
                         autoPlay
@@ -151,12 +151,12 @@ export const Channel: React.FC = () => {
                     
                     {/* Audio/Video indicators */}
                     <div className="absolute bottom-2 left-2 flex space-x-1">
-                      {!participant.isAudioEnabled && (
+                      {!participant.audioEnabled && (
                         <div className="bg-red-500 rounded-full p-1">
                           <MicOff className="w-3 h-3" />
                         </div>
                       )}
-                      {participant.isVideoEnabled && (
+                      {participant.videoEnabled && (
                         <div className="bg-green-500 rounded-full p-1">
                           <Video className="w-3 h-3" />
                         </div>
@@ -247,12 +247,12 @@ export const Channel: React.FC = () => {
                     </span>
                   </div>
                   <div className="flex space-x-1">
-                    {participant.isAudioEnabled ? (
+                    {participant.audioEnabled ? (
                       <Mic className="w-3 h-3 text-green-400" />
                     ) : (
                       <MicOff className="w-3 h-3 text-red-400" />
                     )}
-                    {participant.isVideoEnabled ? (
+                    {participant.videoEnabled ? (
                       <Video className="w-3 h-3 text-green-400" />
                     ) : (
                       <VideoOff className="w-3 h-3 text-gray-400" />
@@ -272,13 +272,13 @@ export const Channel: React.FC = () => {
             <button
               onClick={toggleAudio}
               className={`p-3 rounded-full ${
-                localParticipant?.isAudioEnabled 
+                localParticipant?.audioEnabled 
                   ? 'bg-gray-700 hover:bg-gray-600' 
                   : 'bg-red-500 hover:bg-red-600'
               } transition-colors`}
-              title={localParticipant?.isAudioEnabled ? 'Mute' : 'Unmute'}
+              title={localParticipant?.audioEnabled ? 'Mute' : 'Unmute'}
             >
-              {localParticipant?.isAudioEnabled ? (
+              {localParticipant?.audioEnabled ? (
                 <Mic className="w-5 h-5" />
               ) : (
                 <MicOff className="w-5 h-5" />
@@ -288,13 +288,13 @@ export const Channel: React.FC = () => {
             <button
               onClick={toggleVideo}
               className={`p-3 rounded-full ${
-                localParticipant?.isVideoEnabled 
+                localParticipant?.videoEnabled 
                   ? 'bg-gray-700 hover:bg-gray-600' 
                   : 'bg-red-500 hover:bg-red-600'
               } transition-colors`}
-              title={localParticipant?.isVideoEnabled ? 'Turn off camera' : 'Turn on camera'}
+              title={localParticipant?.videoEnabled ? 'Turn off camera' : 'Turn on camera'}
             >
-              {localParticipant?.isVideoEnabled ? (
+              {localParticipant?.videoEnabled ? (
                 <Video className="w-5 h-5" />
               ) : (
                 <VideoOff className="w-5 h-5" />

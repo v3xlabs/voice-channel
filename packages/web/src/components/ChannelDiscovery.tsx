@@ -1,59 +1,18 @@
-import { FC, useState, useEffect } from 'react';
-import { channelApi } from '../services/api';
-import { authService } from '../services/auth';
-import type { components } from '../types/api';
-
-type Channel = components['schemas']['Channel'];
+import { FC } from 'react';
+import type { Channel } from '../services/api';
 
 export const ChannelDiscovery: FC = () => {
-  const [channels, setChannels] = useState<Channel[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [joinedChannels, setJoinedChannels] = useState<Set<string>>(new Set());
-
-  useEffect(() => {
-    loadChannels();
-    loadUserChannels();
-  }, []);
-
-  const loadChannels = async () => {
-    try {
-      const channelList = await channelApi.list();
-      setChannels(channelList);
-    } catch (error) {
-      console.error('Failed to load channels:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const loadUserChannels = async () => {
-    try {
-      const userChannels = await authService.getUserChannels();
-      const joinedSet = new Set(
-        userChannels.map(ch => `${ch.membership.channel_instance_fqdn}:${ch.membership.channel_name}`)
-      );
-      setJoinedChannels(joinedSet);
-    } catch (error) {
-      console.error('Failed to load user channels:', error);
-    }
-  };
+  // TODO: Implement proper channel discovery with new patterns
+  const channels: Channel[] = [];
+  const isLoading = false;
 
   const handleJoinChannel = async (channel: Channel) => {
     try {
-      await authService.joinChannel(channel.instance_fqdn, channel.name);
-      await loadUserChannels(); // Refresh joined channels
-      
-      // Also refresh the sidebar channels list
-      if ((window as any).refreshUserChannels) {
-        await (window as any).refreshUserChannels();
-      }
+      // TODO: Implement join channel functionality
+      console.log('Joining channel:', channel.name);
     } catch (error) {
       console.error('Failed to join channel:', error);
     }
-  };
-
-  const isChannelJoined = (channel: Channel) => {
-    return joinedChannels.has(`${channel.instance_fqdn}:${channel.name}`);
   };
 
   if (isLoading) {
@@ -88,9 +47,8 @@ export const ChannelDiscovery: FC = () => {
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {channels.map((channel) => (
             <ChannelCard
-              key={channel.id}
+              key={channel.channel_id}
               channel={channel}
-              isJoined={isChannelJoined(channel)}
               onJoin={() => handleJoinChannel(channel)}
             />
           ))}
@@ -102,11 +60,10 @@ export const ChannelDiscovery: FC = () => {
 
 interface ChannelCardProps {
   channel: Channel;
-  isJoined: boolean;
   onJoin: () => void;
 }
 
-const ChannelCard: FC<ChannelCardProps> = ({ channel, isJoined, onJoin }) => {
+const ChannelCard: FC<ChannelCardProps> = ({ channel, onJoin }) => {
   return (
     <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 hover:border-gray-600 transition-colors">
       <div className="flex items-start justify-between mb-4">
@@ -139,18 +96,12 @@ const ChannelCard: FC<ChannelCardProps> = ({ channel, isJoined, onJoin }) => {
           Created {new Date(channel.created_at).toLocaleDateString()}
         </div>
         
-        {isJoined ? (
-          <span className="px-3 py-1 bg-green-600 text-green-100 text-sm rounded-full">
-            Joined
-          </span>
-        ) : (
-          <button
-            onClick={onJoin}
-            className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
-          >
-            Join Channel
-          </button>
-        )}
+        <button
+          onClick={onJoin}
+          className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
+        >
+          Join Channel
+        </button>
       </div>
     </div>
   );

@@ -1,11 +1,13 @@
 import { useQuery, useMutation, useQueryClient, queryOptions } from '@tanstack/react-query';
-import { authService, type InstanceSettings } from '../services/auth';
+import { apiFetch } from '../services/api';
+import { useUser } from './useUser';
+import type { InstanceSettings } from '../services/auth';
 
 const getInstanceSettings = () => queryOptions({
   queryKey: ['admin', 'instance_settings'],
   async queryFn() {
-    const result = await authService.getInstanceSettings();
-    return result;
+    const response = await apiFetch('/admin/settings', 'get', {});
+    return response.data as InstanceSettings;
   },
   staleTime: 5 * 60 * 1000, // 5 minutes
 });
@@ -13,8 +15,8 @@ const getInstanceSettings = () => queryOptions({
 const getRegistrationStatus = () => queryOptions({
   queryKey: ['admin', 'registration_status'],
   async queryFn() {
-    const result = await authService.getRegistrationStatus();
-    return result;
+    const response = await apiFetch('/admin/registration-status', 'get', {});
+    return response.data;
   },
   staleTime: 2 * 60 * 1000, // 2 minutes
 });
@@ -23,7 +25,8 @@ const getAdminUsers = () => queryOptions({
   queryKey: ['admin', 'users'],
   async queryFn() {
     // TODO: Replace with actual API call when endpoint is available
-    // const result = await authService.getUsers();
+    // const response = await apiFetch('/admin/users', 'get', {});
+    // return response.data;
     return [];
   },
   staleTime: 2 * 60 * 1000, // 2 minutes
@@ -33,7 +36,8 @@ const getAdminGroups = () => queryOptions({
   queryKey: ['admin', 'groups'],
   async queryFn() {
     // TODO: Replace with actual API call when endpoint is available
-    // const result = await authService.getGroups();
+    // const response = await apiFetch('/admin/groups', 'get', {});
+    // return response.data;
     return [];
   },
   staleTime: 2 * 60 * 1000, // 2 minutes
@@ -41,35 +45,53 @@ const getAdminGroups = () => queryOptions({
 
 export const useAdmin = () => {
   const queryClient = useQueryClient();
+  const { user, isAuthenticated } = useUser();
+  const isAdmin = isAuthenticated && user?.is_admin === true;
 
   const {
     data: instanceSettings,
     isLoading: isLoadingSettings,
     error: settingsError,
-  } = useQuery(getInstanceSettings());
+  } = useQuery({
+    ...getInstanceSettings(),
+    enabled: isAdmin,
+  });
 
   const {
     data: registrationStatus,
     isLoading: isLoadingStatus,
     error: statusError,
-  } = useQuery(getRegistrationStatus());
+  } = useQuery({
+    ...getRegistrationStatus(),
+    enabled: isAdmin,
+  });
 
   const {
     data: users = [],
     isLoading: isLoadingUsers,
     error: usersError,
-  } = useQuery(getAdminUsers());
+  } = useQuery({
+    ...getAdminUsers(),
+    enabled: isAdmin,
+  });
 
   const {
     data: groups = [],
     isLoading: isLoadingGroups,
     error: groupsError,
-  } = useQuery(getAdminGroups());
+  } = useQuery({
+    ...getAdminGroups(),
+    enabled: isAdmin,
+  });
 
   const updateInstanceSettingsMutation = useMutation({
     mutationFn: async (settings: Partial<InstanceSettings>) => {
       // TODO: Replace with actual API call when endpoint is available
-      // return authService.updateInstanceSettings(settings);
+      // const response = await apiFetch('/admin/settings', 'patch', {
+      //   contentType: 'application/json; charset=utf-8',
+      //   data: settings,
+      // });
+      // return response.data;
       return settings;
     },
     onSuccess: () => {
@@ -80,7 +102,11 @@ export const useAdmin = () => {
   const createInvitationMutation = useMutation({
     mutationFn: async (data: { email?: string; maxUses?: number }) => {
       // TODO: Replace with actual API call when endpoint is available
-      // return authService.createInvitation(data);
+      // const response = await apiFetch('/admin/invitations', 'post', {
+      //   contentType: 'application/json; charset=utf-8',
+      //   data,
+      // });
+      // return response.data;
       return data;
     },
     onSuccess: () => {
@@ -119,6 +145,6 @@ export const useAdmin = () => {
     isCreatingInvitation: createInvitationMutation.isPending,
 
     // Helper
-    isAdmin: authService.isAdmin(),
+    isAdmin,
   };
 }; 

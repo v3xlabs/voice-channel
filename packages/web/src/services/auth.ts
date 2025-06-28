@@ -2,7 +2,7 @@ import { apiFetch } from './api';
 import type { components } from '../types/api';
 import { startRegistration, startAuthentication } from '@simplewebauthn/browser';
 
-// Type definitions
+// Type definitions from OpenAPI schema
 export type User = components['schemas']['User'];
 export type CreateUserRequest = components['schemas']['CreateUserRequest'];
 export type UpdateUserRequest = components['schemas']['UpdateUserRequest'];
@@ -12,57 +12,10 @@ export type ChannelMembershipWithChannel = components['schemas']['ChannelMembers
 export type InstanceSettings = components['schemas']['InstanceSettings'];
 export type Invitation = components['schemas']['Invitation'];
 
-// Custom interface for auth responses
-export interface AuthResponse {
-  user: User;
-  success: boolean;
-}
-
-const STORAGE_KEY = 'voice-channel-user';
-
+// WebAuthn-only AuthService
 export class AuthService {
-  private currentUser: User | null = null;
-
-  constructor() {
-    this.loadFromStorage();
-  }
-
-  // Load user from localStorage
-  private loadFromStorage(): void {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const userData = JSON.parse(stored);
-        this.currentUser = userData;
-      }
-    } catch (error) {
-      console.error('Failed to load user from storage:', error);
-      localStorage.removeItem(STORAGE_KEY);
-    }
-  }
-
-  // Save user to localStorage
-  private saveToStorage(user: User): void {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
-      this.currentUser = user;
-    } catch (error) {
-      console.error('Failed to save user to storage:', error);
-    }
-  }
-
-  // Get current user
-  getCurrentUser(): User | null {
-    return this.currentUser;
-  }
-
-  // Check if user is logged in
-  isLoggedIn(): boolean {
-    return this.currentUser !== null;
-  }
-
   // Create new account with WebAuthn passkey
-  async createAccount(displayName: string, inviteCode?: string): Promise<AuthResponse> {
+  async createAccount(displayName: string, inviteCode?: string): Promise<{ user_id: string; success: boolean }> {
     try {
       console.log('🆕 Starting WebAuthn registration for:', displayName);
       
@@ -112,16 +65,7 @@ export class AuthService {
       const regResponse = finishResponse.data;
       
       if (regResponse.success && regResponse.user_id) {
-        // Fetch full user profile after successful registration
-        const userResponse = await apiFetch('/users/{user_id}', 'get', {
-          path: { user_id: regResponse.user_id },
-        });
-        
-        const user = userResponse.data as User;
-        this.saveToStorage(user);
-        console.log('💾 User profile fetched and saved to storage:', user);
-        
-        return { user, success: true } as AuthResponse;
+        return { user_id: regResponse.user_id, success: true };
       } else {
         throw new Error('Registration completed but failed to get user data');
       }
@@ -133,7 +77,7 @@ export class AuthService {
   }
 
   // Login with WebAuthn passkey
-  async loginWithPasskey(): Promise<boolean> {
+  async loginWithPasskey(): Promise<{ user_id: string; success: boolean }> {
     try {
       console.log('🔐 Starting WebAuthn authentication...');
       
@@ -180,16 +124,7 @@ export class AuthService {
       const loginResponse = finishResponse.data;
       
       if (loginResponse.success && loginResponse.user_id) {
-        // Fetch full user profile after successful login
-        const userResponse = await apiFetch('/users/{user_id}', 'get', {
-          path: { user_id: loginResponse.user_id },
-        });
-        
-        const user = userResponse.data as User;
-        this.saveToStorage(user);
-        console.log('💾 User profile fetched and saved after login:', user);
-        
-        return true;
+        return { user_id: loginResponse.user_id, success: true };
       } else {
         throw new Error('Login completed but failed to get user data');
       }
@@ -203,102 +138,8 @@ export class AuthService {
         console.error('❌ WebAuthn error message:', (error as any).message);
       }
       
-      // Clear stored user on authentication failure
-      localStorage.removeItem(STORAGE_KEY);
-      this.currentUser = null;
-      return false;
+      throw error;
     }
-  }
-
-  // Update user profile
-  async updateProfile(updates: UpdateUserRequest): Promise<User> {
-    if (!this.currentUser) {
-      throw new Error('No user logged in');
-    }
-
-    const response = await apiFetch('/users/{user_id}', 'patch', {
-      path: { user_id: this.currentUser.user_id },
-      contentType: 'application/json; charset=utf-8',
-      data: updates,
-    });
-
-    const updatedUser = response.data as User;
-    this.saveToStorage(updatedUser);
-    
-    return updatedUser;
-  }
-
-  // Get user's joined channels
-  async getUserChannels(): Promise<ChannelMembershipWithChannel[]> {
-    if (!this.currentUser) {
-      throw new Error('No user logged in');
-    }
-
-    const response = await apiFetch('/users/{user_id}/channels', 'get', {
-      path: { user_id: this.currentUser.user_id },
-    });
-
-    return response.data as ChannelMembershipWithChannel[];
-  }
-
-  // Join a channel (become a member)
-  async joinChannel(instanceFqdn: string, channelName: string): Promise<ChannelMembership> {
-    if (!this.currentUser) {
-      throw new Error('No user logged in');
-    }
-
-    const response = await apiFetch('/channels/{channel_instance_fqdn}/{channel_name}/members', 'post', {
-      path: { 
-        channel_instance_fqdn: instanceFqdn,
-        channel_name: channelName,
-      },
-      query: { user_id: this.currentUser.user_id },
-    });
-
-    return response.data as ChannelMembership;
-  }
-
-  // Leave a channel (remove membership)
-  async leaveChannel(instanceFqdn: string, channelName: string): Promise<void> {
-    if (!this.currentUser) {
-      throw new Error('No user logged in');
-    }
-
-    await apiFetch('/channels/{channel_instance_fqdn}/{channel_name}/members/{user_id}', 'delete', {
-      path: { 
-        channel_instance_fqdn: instanceFqdn,
-        channel_name: channelName,
-        user_id: this.currentUser.user_id,
-      },
-    });
-  }
-
-  // Logout
-  logout(): void {
-    localStorage.removeItem(STORAGE_KEY);
-    this.currentUser = null;
-  }
-
-  // Check if user has WebAuthn credentials (based on stored user)
-  hasStoredPasskey(): boolean {
-    return this.currentUser !== null;
-  }
-
-  // Check if current user is admin
-  isAdmin(): boolean {
-    return this.currentUser?.is_admin === true;
-  }
-
-  // Admin: Get instance settings
-  async getInstanceSettings(): Promise<InstanceSettings> {
-    const response = await apiFetch('/admin/settings', 'get', {});
-    return response.data as InstanceSettings;
-  }
-
-  // Admin: Get registration status
-  async getRegistrationStatus(): Promise<any> {
-    const response = await apiFetch('/admin/registration-status', 'get', {});
-    return response.data;
   }
 
   // Get invitation by code (for registration)

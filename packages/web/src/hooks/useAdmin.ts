@@ -3,132 +3,111 @@ import { apiFetch } from '../services/api';
 import { useUser } from './useUser';
 import type { components } from '../schema.gen';
 
-type User = components['schemas']['User'];
-type Invitation = components['schemas']['Invitation'];
-
-interface InvitationWithCreator extends Invitation {
-  creator_username: string;
-  creator_display_name: string;
-}
+type CreateInvitationRequest = components['schemas']['CreateInvitationRequest'];
+type UpdateInstanceSettingsRequest = components['schemas']['UpdateInstanceSettingsRequest'];
 
 const getInstanceSettings = () => queryOptions({
   queryKey: ['auth', 'admin', 'instance_settings'],
-  async queryFn() {
-    const response = await apiFetch('/admin/settings', 'get', {});
-    return response.data;
-  },
-  staleTime: 5 * 60 * 1000, // 5 minutes
+  queryFn: async () => {
+    const result = await apiFetch('/admin/settings', 'get', {
+      query: {
+        instance_fqdn: 'localhost', // TODO: Get from config
+        admin_user_id: 'current_user_id' // TODO: Get from auth context
+      }
+    });
+    return result.data;
+  }
 });
 
-const getRegistrationStatus = () => queryOptions({
-  queryKey: ['auth', 'admin', 'registration_status'],
-  async queryFn() {
-    const response = await apiFetch('/admin/registration-status', 'get', {});
-    return response.data;
-  },
-  staleTime: 2 * 60 * 1000, // 2 minutes
+export const useInstanceSettings = () => {
+  const { user } = useUser();
+  
+  return useQuery({
+    ...getInstanceSettings(),
+    enabled: !!user?.is_admin
+  });
+};
+
+const getUsers = () => queryOptions({
+  queryKey: ['auth', 'admin', 'users'],
+  queryFn: async () => {
+    const result = await apiFetch('/admin/users', 'get', {
+      query: {
+        instance_fqdn: 'localhost', // TODO: Get from config
+        admin_user_id: 'current_user_id' // TODO: Get from auth context
+      }
+    });
+    return result.data;
+  }
 });
 
-// TODO: These endpoints need to be added to the backend's OpenAPI spec
-// Currently missing from generated types:
-// - GET /admin/users
-// - GET /admin/invitations  
-// - GET /admin/invitations/my
-// - POST /admin/invitations
-// - PATCH /admin/settings
-// - POST /admin/invitations/{id}/deactivate
-// - DELETE /admin/invitations/{id}
+export const useUsers = () => {
+  const { user } = useUser();
+  
+  return useQuery({
+    ...getUsers(),
+    enabled: !!user?.is_admin
+  });
+};
 
-const getInstanceUsers = (userId: string, instanceFqdn: string) => queryOptions({
-  queryKey: ['auth', 'admin', 'users', instanceFqdn],
-  async queryFn() {
-    // This endpoint is not in the OpenAPI spec yet
-    // Will return empty array until backend OpenAPI spec is updated
-    console.warn('GET /admin/users endpoint not available in OpenAPI spec yet');
-    return [] as User[];
-  },
-  staleTime: 2 * 60 * 1000, // 2 minutes
+const getInvitations = () => queryOptions({
+  queryKey: ['auth', 'admin', 'invitations'],
+  queryFn: async () => {
+    const result = await apiFetch('/admin/invitations', 'get', {
+      query: {
+        instance_fqdn: 'localhost', // TODO: Get from config
+        admin_user_id: 'current_user_id' // TODO: Get from auth context
+      }
+    });
+    return result.data;
+  }
 });
 
-const getInstanceInvitations = (userId: string, instanceFqdn: string) => queryOptions({
-  queryKey: ['auth', 'admin', 'invitations', instanceFqdn],
-  async queryFn() {
-    // This endpoint is not in the OpenAPI spec yet
-    // Will return empty array until backend OpenAPI spec is updated
-    console.warn('GET /admin/invitations endpoint not available in OpenAPI spec yet');
-    return [] as InvitationWithCreator[];
-  },
-  staleTime: 2 * 60 * 1000, // 2 minutes
+export const useInvitations = () => {
+  const { user } = useUser();
+  
+  return useQuery({
+    ...getInvitations(),
+    enabled: !!user?.is_admin
+  });
+};
+
+const getMyInvitations = () => queryOptions({
+  queryKey: ['auth', 'admin', 'my_invitations'],
+  queryFn: async () => {
+    const result = await apiFetch('/admin/invitations/my', 'get', {
+      query: {
+        user_id: 'current_user_id' // TODO: Get from auth context
+      }
+    });
+    return result.data;
+  }
 });
 
-const getMyInvitations = (userId: string) => queryOptions({
-  queryKey: ['auth', 'admin', 'my_invitations', userId],
-  async queryFn() {
-    // This endpoint is not in the OpenAPI spec yet
-    // Will return empty array until backend OpenAPI spec is updated
-    console.warn('GET /admin/invitations/my endpoint not available in OpenAPI spec yet');
-    return [] as Invitation[];
-  },
-  staleTime: 2 * 60 * 1000, // 2 minutes
-});
+export const useMyInvitations = () => {
+  const { user } = useUser();
+  
+  return useQuery({
+    ...getMyInvitations(),
+    enabled: !!user
+  });
+};
 
 export const useAdmin = () => {
   const queryClient = useQueryClient();
-  const { user, isAuthenticated } = useUser();
-  const isAdmin = isAuthenticated && user?.is_admin === true;
-  const userId = user?.user_id || '';
-  const instanceFqdn = user?.instance_fqdn || '';
-
-  const {
-    data: instanceSettings,
-    isLoading: isLoadingSettings,
-    error: settingsError,
-  } = useQuery({
-    ...getInstanceSettings(),
-    enabled: isAdmin,
-  });
-
-  const {
-    data: registrationStatus,
-    isLoading: isLoadingStatus,
-    error: statusError,
-  } = useQuery({
-    ...getRegistrationStatus(),
-    enabled: isAdmin,
-  });
-
-  const {
-    data: users = [],
-    isLoading: isLoadingUsers,
-    error: usersError,
-  } = useQuery({
-    ...getInstanceUsers(userId, instanceFqdn),
-    enabled: isAdmin && !!userId && !!instanceFqdn,
-  });
-
-  const {
-    data: invitations = [],
-    isLoading: isLoadingInvitations,
-    error: invitationsError,
-  } = useQuery({
-    ...getInstanceInvitations(userId, instanceFqdn),
-    enabled: isAdmin && !!userId && !!instanceFqdn,
-  });
-
-  const {
-    data: myInvitations = [],
-    isLoading: isLoadingMyInvitations,
-    error: myInvitationsError,
-  } = useQuery({
-    ...getMyInvitations(userId),
-    enabled: isAuthenticated && !!userId,
-  });
+  const { user } = useUser();
 
   const updateInstanceSettingsMutation = useMutation({
-    mutationFn: async () => {
-      // PATCH /admin/settings is not in the OpenAPI spec yet
-      console.warn('PATCH /admin/settings endpoint not available in OpenAPI spec yet');
-      throw new Error('Update settings endpoint not available - needs to be added to backend OpenAPI spec');
+    mutationFn: async (settings: UpdateInstanceSettingsRequest) => {
+      const result = await apiFetch('/admin/settings', 'patch', {
+        query: {
+          instance_fqdn: 'localhost', // TODO: Get from config
+          admin_user_id: 'current_user_id' // TODO: Get from auth context
+        },
+        contentType: 'application/json; charset=utf-8',
+        data: settings
+      });
+      return result.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['auth', 'admin', 'instance_settings'] });
@@ -136,10 +115,15 @@ export const useAdmin = () => {
   });
 
   const createInvitationMutation = useMutation({
-    mutationFn: async () => {
-      // POST /admin/invitations is not in the OpenAPI spec yet
-      console.warn('POST /admin/invitations endpoint not available in OpenAPI spec yet');
-      throw new Error('Create invitation endpoint not available - needs to be added to backend OpenAPI spec');
+    mutationFn: async (requestData: CreateInvitationRequest) => {
+      const result = await apiFetch('/admin/invitations', 'post', {
+        query: {
+          instance_fqdn: 'localhost', // TODO: Get from config
+          user_id: 'current_user_id' // TODO: Get from auth context
+        },
+        data: requestData
+      });
+      return result.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['auth', 'admin', 'invitations'] });
@@ -148,10 +132,14 @@ export const useAdmin = () => {
   });
 
   const deactivateInvitationMutation = useMutation({
-    mutationFn: async () => {
-      // POST /admin/invitations/{id}/deactivate is not in the OpenAPI spec yet
-      console.warn('POST /admin/invitations/{id}/deactivate endpoint not available in OpenAPI spec yet');
-      throw new Error('Deactivate invitation endpoint not available - needs to be added to backend OpenAPI spec');
+    mutationFn: async (invitationId: string) => {
+      const result = await apiFetch('/admin/invitations/{invitation_id}/deactivate', 'post', {
+        params: { invitation_id: invitationId },
+        query: {
+          _user_id: 'current_user_id' // TODO: Get from auth context
+        }
+      });
+      return result.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['auth', 'admin', 'invitations'] });
@@ -160,10 +148,14 @@ export const useAdmin = () => {
   });
 
   const deleteInvitationMutation = useMutation({
-    mutationFn: async () => {
-      // DELETE /admin/invitations/{id} is not in the OpenAPI spec yet
-      console.warn('DELETE /admin/invitations/{id} endpoint not available in OpenAPI spec yet');
-      throw new Error('Delete invitation endpoint not available - needs to be added to backend OpenAPI spec');
+    mutationFn: async (invitationId: string) => {
+      const result = await apiFetch('/admin/invitations/{invitation_id}', 'delete', {
+        params: { invitation_id: invitationId },
+        query: {
+          _user_id: 'current_user_id' // TODO: Get from auth context
+        }
+      });
+      return result.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['auth', 'admin', 'invitations'] });
@@ -171,44 +163,27 @@ export const useAdmin = () => {
     },
   });
 
-  const isLoading = isLoadingSettings || isLoadingStatus || isLoadingUsers || isLoadingInvitations;
-  const error = settingsError || statusError || usersError || invitationsError;
-
   return {
-    // Data
-    instanceSettings,
-    registrationStatus,
-    users,
-    invitations,
-    myInvitations,
-
-    // Loading states
-    isLoading,
-    isLoadingSettings,
-    isLoadingStatus,
-    isLoadingUsers,
-    isLoadingInvitations,
-    isLoadingMyInvitations,
-
-    // Error states
-    error,
-    settingsError,
-    statusError,
-    usersError,
-    invitationsError,
-    myInvitationsError,
-
+    // Data fetching hooks (use these in components)
+    instanceSettings: useInstanceSettings(),
+    users: useUsers(),
+    invitations: useInvitations(),
+    myInvitations: useMyInvitations(),
+    
     // Mutations
     updateInstanceSettings: updateInstanceSettingsMutation.mutate,
-    isUpdatingSettings: updateInstanceSettingsMutation.isPending,
+    isUpdatingInstanceSettings: updateInstanceSettingsMutation.isPending,
+    
     createInvitation: createInvitationMutation.mutate,
     isCreatingInvitation: createInvitationMutation.isPending,
+    
     deactivateInvitation: deactivateInvitationMutation.mutate,
     isDeactivatingInvitation: deactivateInvitationMutation.isPending,
+    
     deleteInvitation: deleteInvitationMutation.mutate,
     isDeletingInvitation: deleteInvitationMutation.isPending,
-
-    // Helper
-    isAdmin,
+    
+    // Admin status
+    isAdmin: user?.is_admin || false,
   };
 }; 

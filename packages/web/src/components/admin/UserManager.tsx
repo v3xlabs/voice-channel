@@ -1,7 +1,7 @@
 import { FC, useState } from 'react';
 import classNames from 'classnames';
 import { useAdmin } from '../../hooks/useAdmin';
-import type { components } from '../../types/api';
+import type { components } from '../../schema.gen';
 
 type User = components['schemas']['User'];
 
@@ -99,13 +99,13 @@ const UserStats: FC<UserStatsProps> = ({ users }) => {
 };
 
 export const UserManager: FC = () => {
-  const { users, isLoadingUsers } = useAdmin();
+  const { users: { data: users, isLoading: isLoadingUsers } } = useAdmin();
   const [filter, setFilter] = useState<'all' | 'admins' | 'users' | 'recent'>('all');
   const [searchTerm, setSearchTerm] = useState('');
 
-  const filteredUsers = users.filter((user) => {
+  const filteredUsers = users?.filter((user) => {
     // Apply text search filter
-    const matchesSearch = searchTerm === '' || 
+    const matchesSearch = searchTerm === '' ||
       user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.display_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.instance_fqdn.toLowerCase().includes(searchTerm.toLowerCase());
@@ -128,7 +128,7 @@ export const UserManager: FC = () => {
     }
   });
 
-  const sortedUsers = filteredUsers.sort((a, b) => {
+  const sortedUsers = filteredUsers?.sort((a, b) => {
     // Sort by admin status first, then by creation date
     if (a.is_admin && !b.is_admin) return -1;
     if (!a.is_admin && b.is_admin) return 1;
@@ -138,10 +138,10 @@ export const UserManager: FC = () => {
   return (
     <div className="bg-gray-800 rounded-lg p-6">
       <h2 className="text-xl font-semibold mb-6">User Management</h2>
-      
+
       {/* User Statistics */}
-      <UserStats users={users} />
-      
+      <UserStats users={users || []} />
+
       {/* Search and Filter Controls */}
       <div className="mb-6 space-y-4">
         <div>
@@ -153,7 +153,7 @@ export const UserManager: FC = () => {
             className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:border-blue-500 text-white placeholder-gray-400"
           />
         </div>
-        
+
         <div className="flex space-x-2">
           <button
             onClick={() => setFilter('all')}
@@ -162,7 +162,7 @@ export const UserManager: FC = () => {
               filter === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
             )}
           >
-            All Users ({users.length})
+            All Users ({users?.length})
           </button>
           <button
             onClick={() => setFilter('admins')}
@@ -193,14 +193,14 @@ export const UserManager: FC = () => {
           </button>
         </div>
       </div>
-      
+
       {/* Users Table */}
       {isLoadingUsers ? (
         <div className="text-center py-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-4"></div>
           <p>Loading users...</p>
         </div>
-      ) : sortedUsers.length === 0 ? (
+      ) : sortedUsers?.length === 0 ? (
         <div className="text-center py-8 text-gray-400">
           {searchTerm ? `No users found matching "${searchTerm}".` : 'No users found.'}
         </div>
@@ -219,18 +219,18 @@ export const UserManager: FC = () => {
               </tr>
             </thead>
             <tbody>
-              {sortedUsers.map((user) => (
+              {sortedUsers?.map((user) => (
                 <UserRow key={user.user_id} user={user} />
               ))}
             </tbody>
           </table>
         </div>
       )}
-      
+
       {/* Summary */}
-      {filteredUsers.length > 0 && (
+      {filteredUsers && filteredUsers.length > 0 && (
         <div className="mt-4 text-sm text-gray-400">
-          Showing {filteredUsers.length} of {users.length} users
+          Showing {filteredUsers.length} of {users?.length} users
         </div>
       )}
     </div>

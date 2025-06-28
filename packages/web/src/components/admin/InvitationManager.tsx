@@ -239,8 +239,7 @@ const InvitationRow: FC<InvitationRowProps> = ({
 
 export const InvitationManager: FC = () => {
   const {
-    invitations,
-    isLoadingInvitations,
+    invitations: { data: invitations, isLoading: isLoadingInvitations },
     createInvitation,
     isCreatingInvitation,
     deactivateInvitation,
@@ -251,16 +250,16 @@ export const InvitationManager: FC = () => {
 
   const [filter, setFilter] = useState<'all' | 'active' | 'inactive' | 'expired'>('all');
 
-  const filteredInvitations = invitations.filter((invitation) => {
+  const filteredInvitations = invitations?.filter((invitation) => {
     switch (filter) {
       case 'active':
-        return invitation.is_active && 
-               (!invitation.expires_at || new Date(invitation.expires_at) > new Date()) &&
-               (!invitation.max_uses || invitation.current_uses < invitation.max_uses);
+        return invitation.invitation.is_active && 
+               (!invitation.invitation.expires_at || new Date(invitation.invitation.expires_at) > new Date()) &&
+               (!invitation.invitation.max_uses || invitation.invitation.current_uses < invitation.invitation.max_uses);
       case 'inactive':
-        return !invitation.is_active;
+        return !invitation.invitation.is_active;
       case 'expired':
-        return invitation.expires_at && new Date(invitation.expires_at) <= new Date();
+        return invitation.invitation.expires_at && new Date(invitation.invitation.expires_at) <= new Date();
       default:
         return true;
     }
@@ -288,7 +287,7 @@ export const InvitationManager: FC = () => {
             filter === 'all' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
           )}
         >
-          All ({invitations.length})
+          All ({invitations?.length})
         </button>
         <button
           onClick={() => setFilter('active')}
@@ -325,7 +324,7 @@ export const InvitationManager: FC = () => {
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-4"></div>
           <p>Loading invitations...</p>
         </div>
-      ) : filteredInvitations.length === 0 ? (
+      ) : filteredInvitations && filteredInvitations.length === 0 ? (
         <div className="text-center py-8 text-gray-400">
           No invitations found.
         </div>
@@ -344,10 +343,10 @@ export const InvitationManager: FC = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredInvitations.map((invitation) => (
+              {filteredInvitations?.map((invitation) => (
                 <InvitationRow
-                  key={invitation.invitation_id}
-                  invitation={invitation}
+                  key={invitation.invitation.invitation_id}
+                  invitation={invitation.invitation}
                   onDeactivate={deactivateInvitation}
                   onDelete={deleteInvitation}
                   isDeactivating={isDeactivatingInvitation}

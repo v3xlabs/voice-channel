@@ -42,10 +42,10 @@ graph TD
 
 This is a key distinction for user experience:
 
-| Concept                 | Description                                                                 | Action Required      |
-| ----------------------- | --------------------------------------------------------------------------- | -------------------- |
-| **Channel Membership**  | Subscribing to a channel. This adds it to your sidebar for text chat access. | "Join Channel"       |
-| **Voice Call**          | Actively participating in the real-time voice/video call within a channel.  | "Join Call" (explicit) |
+| Concept                | Description                                                                  | Action Required        |
+| ---------------------- | ---------------------------------------------------------------------------- | ---------------------- |
+| **Channel Membership** | Subscribing to a channel. This adds it to your sidebar for text chat access. | "Join Channel"         |
+| **Voice Call**         | Actively participating in the real-time voice/video call within a channel.   | "Join Call" (explicit) |
 
 The default view for a channel is the text chat. Users must explicitly join the voice call.
 
@@ -53,11 +53,11 @@ The default view for a channel is the text chat. Users must explicitly join the 
 
 ### Technology Stack
 
-| Area      | Technology                                                                          |
-| --------- | ----------------------------------------------------------------------------------- |
-| **Server**| Rust, Poem, `poem_openapi`, SQLx, PostgreSQL, Redis, Mediasoup                       |
-| **Web**   | PNPM, React, TypeScript, Vite, Tailwind CSS, Radix UI, TanStack (Router & Query) |
-| **API**   | `openapi-typescript` and `openapi-hooks` for frontend/backend integration        |
+| Area       | Technology                                                                       |
+| ---------- | -------------------------------------------------------------------------------- |
+| **Server** | Rust, Poem, `poem_openapi`, SQLx, PostgreSQL, Redis, Mediasoup                   |
+| **Web**    | PNPM, React, TypeScript, Vite, Tailwind CSS, Radix UI, TanStack (Router & Query) |
+| **API**    | `openapi-typescript` and `openapi-hooks` for frontend/backend integration        |
 
 ### Service & API Structure
 
@@ -112,13 +112,13 @@ After completion, `/setup` is disabled until the database is emptied again.
 
 The URL scheme is designed for seamless local and federated channel access.
 
-| Scope             | URL Example                                     | Description                                               |
-| ----------------- | ----------------------------------------------- | --------------------------------------------------------- |
-| **Local**         | `https://voice.channel/dev/rust`                | Accesses the `rust` channel in the `dev` group on the current instance. |
-| **Local (Admin)** | `https://voice.channel/general`                 | The group name (`admin`) can be omitted for the default admin group. |
-| **Federated**     | `https://voice.channel/v3x.vc/gaming/retro`     | Accesses the `retro` channel in the `gaming` group on the `v3x.vc` instance. |
+| Scope             | URL Example                                 | Description                                                                  |
+| ----------------- | ------------------------------------------- | ---------------------------------------------------------------------------- |
+| **Local**         | `https://voice.channel/dev/rust`            | Accesses the `rust` channel in the `dev` group on the current instance.      |
+| **Local (Admin)** | `https://voice.channel/general`             | The group name (`admin`) can be omitted for the default admin group.         |
+| **Federated**     | `https://voice.channel/v3x.vc/gaming/retro` | Accesses the `retro` channel in the `gaming` group on the `v3x.vc` instance. |
 
 ## 6. Reserved URLs
 
 -   `/settings`: User profile and application settings.
--   `/admin`: Instance administration panel for users with admin permissions. 
+-   `/admin`: Instance administration panel for users with admin permissions.

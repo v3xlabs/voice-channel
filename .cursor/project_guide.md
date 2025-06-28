@@ -84,7 +84,7 @@ Instances can be scaled horizontally by running multiple worker processes.
 
 1.  **Bootstrapping**: When an instance is new (zero users in the database), the first person to sign up is automatically granted administrator privileges. This user can then configure the instance.
 2.  **Registration**: New user registration can be configured instance-wide:
-    -   **Invite-Only**: Users must have a unique invite link (`/invite/:code`) to create an account.
+    -   **Invite-Only**: Users must have a unique invite link (`/invite/:code`) to create an account. Or visit the homepage.
     -   **Open**: Anyone can create an account.
 
 ### Instance Data Model
@@ -315,7 +315,8 @@ const { login, register } = useAuth();
 ```
 
 #### Passkey Flow
-1. User clicks login/register
+1. User visits website and either registers (if registration is open) or visits `/invite/:code` the code is validated, and the user picks a username.
+   1. if the user is admin this is done via the bootstrap wizard.
 2. WebAuthn challenge requested from server
 3. Browser handles passkey creation/authentication
 4. Server validates and returns user_id

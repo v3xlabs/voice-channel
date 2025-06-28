@@ -1,7 +1,10 @@
 import { useQuery, useMutation, useQueryClient, queryOptions } from '@tanstack/react-query';
 import { useAuthContext } from '../contexts/AuthContext';
 import { apiFetch } from '../services/api';
-import type { ChannelMembership, ChannelMembershipWithChannel } from '../services/auth';
+import type { components } from '../types/api';
+
+type ChannelMembership = components['schemas']['ChannelMembership'];
+type ChannelMembershipWithChannel = components['schemas']['ChannelMembershipWithChannel'];
 
 const getUserChannels = (userId: string) => queryOptions({
   queryKey: ['auth', 'user', userId, 'channels'],

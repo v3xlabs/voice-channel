@@ -1,7 +1,9 @@
 import { useQuery, useMutation, useQueryClient, queryOptions } from '@tanstack/react-query';
 import { apiFetch } from '../services/api';
 import { useUser } from './useUser';
-import type { InstanceSettings } from '../services/auth';
+import type { components } from '../types/api';
+
+type InstanceSettings = components['schemas']['InstanceSettings'];
 
 const getInstanceSettings = () => queryOptions({
   queryKey: ['admin', 'instance_settings'],

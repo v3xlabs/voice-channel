@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { FC, useState } from 'react';
-import { startAuthentication, startRegistration } from '@simplewebauthn/browser';
+import { webAuthnService, WebAuthnUtils } from '../services/webauthn';
 
 const TestAuthPage: FC = () => {
   const [result, setResult] = useState<string>('');
@@ -11,7 +11,7 @@ const TestAuthPage: FC = () => {
     setResult('');
 
     try {
-      console.log('🆕 Testing WebAuthn registration...');
+      console.log('🆕 Testing native WebAuthn registration...');
       
       // Step 1: Start WebAuthn registration
       const beginResponse = await fetch('/api/auth/register/begin', {
@@ -29,17 +29,45 @@ const TestAuthPage: FC = () => {
       const beginData = await beginResponse.json();
       console.log('📡 Registration begin response:', beginData);
 
-      // Step 2: Create credential
-      const credential = await startRegistration(beginData.options);
-      console.log('🔑 Created credential:', credential);
+      // Step 2: Create credential using native WebAuthn
+      const serverOptions = beginData.options.publicKey || beginData.options;
+      const challenge = serverOptions.challenge;
+      const user = serverOptions.user;
 
-      // Step 3: Finish registration
+      if (!challenge || !user) {
+        throw new Error('Invalid registration options from server');
+      }
+
+      const credential = await webAuthnService.register(
+        challenge,
+        user.id,
+        user.name,
+        user.displayName
+      );
+      console.log('🔑 Created credential with native WebAuthn:', credential);
+
+      // Step 3: Convert credential to backend format
+      const backendCredential = {
+        id: credential.id,
+        rawId: WebAuthnUtils.bufferToBase64url(credential.rawId),
+        response: {
+          clientDataJSON: WebAuthnUtils.bufferToBase64url(credential.response.clientDataJSON),
+          attestationObject: credential.response.attestationObject 
+            ? WebAuthnUtils.bufferToBase64url(credential.response.attestationObject)
+            : undefined,
+        },
+        type: credential.type,
+        clientExtensionResults: credential.clientExtensionResults || {},
+        authenticatorAttachment: credential.authenticatorAttachment,
+      };
+
+      // Step 4: Finish registration
       const finishResponse = await fetch('/api/auth/register/finish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           challenge_id: beginData.challenge_id,
-          credential: credential,
+          credential: backendCredential,
         }),
       });
 
@@ -64,7 +92,7 @@ const TestAuthPage: FC = () => {
     setResult('');
 
     try {
-      console.log('🔐 Testing WebAuthn authentication...');
+      console.log('🔐 Testing native WebAuthn authentication...');
       
       // Step 1: Start WebAuthn authentication
       const beginResponse = await fetch('/api/auth/login/begin', {
@@ -81,27 +109,46 @@ const TestAuthPage: FC = () => {
       console.log('📡 Login begin response:', beginData);
       console.log('🔍 Authentication options:', JSON.stringify(beginData.options, null, 2));
 
-      // Check for resident key configuration
-      const options = beginData.options;
-      if (options.publicKey) {
-        console.log('🔑 RP ID:', options.publicKey.rpId);
-        console.log('🔗 Allow credentials:', options.publicKey.allowCredentials);
-        console.log('🎭 Mediation:', options.mediation);
-        console.log('✅ User verification:', options.publicKey.userVerification);
+      // Step 2: Authenticate using native WebAuthn
+      const serverOptions = beginData.options.publicKey || beginData.options;
+      const challenge = serverOptions.challenge;
+
+      if (!challenge) {
+        throw new Error('Invalid authentication options from server');
       }
 
-      // Step 2: Authenticate
-      console.log('🚀 Starting authentication with browser...');
-      const credential = await startAuthentication(beginData.options);
+      console.log('🚀 Starting authentication with native WebAuthn...');
+      const credential = await webAuthnService.authenticate(challenge);
       console.log('🎯 Authentication credential:', credential);
 
-      // Step 3: Finish authentication
+      // Step 3: Convert credential to backend format
+      const backendCredential = {
+        id: credential.id,
+        rawId: WebAuthnUtils.bufferToBase64url(credential.rawId),
+        response: {
+          clientDataJSON: WebAuthnUtils.bufferToBase64url(credential.response.clientDataJSON),
+          authenticatorData: credential.response.authenticatorData
+            ? WebAuthnUtils.bufferToBase64url(credential.response.authenticatorData)
+            : undefined,
+          signature: credential.response.signature
+            ? WebAuthnUtils.bufferToBase64url(credential.response.signature)
+            : undefined,
+          userHandle: credential.response.userHandle
+            ? WebAuthnUtils.bufferToBase64url(credential.response.userHandle)
+            : undefined,
+        },
+        type: credential.type,
+        clientExtensionResults: credential.clientExtensionResults || {},
+        authenticatorAttachment: credential.authenticatorAttachment,
+      };
+
+      // Step 4: Finish authentication
       const finishResponse = await fetch('/api/auth/login/finish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           challenge_id: beginData.challenge_id,
-          credential: credential,
+          credential: backendCredential,
         }),
       });
 
@@ -129,71 +176,104 @@ const TestAuthPage: FC = () => {
     }
   };
 
+  const testSupport = async () => {
+    const support = webAuthnService.getBrowserInfo();
+    const supportsResidentKeys = await webAuthnService.supportsResidentKeys();
+    const hasCredentials = await webAuthnService.hasDiscoverableCredentials();
+
+    setResult(`
+🔧 WebAuthn Support Information:
+• Browser: ${support.userAgent.split(' ').pop()}
+• Platform: ${support.platform}
+• WebAuthn Supported: ${support.webAuthnSupported ? '✅' : '❌'}
+• Conditional Mediation: ${support.conditionalMediationSupported ? '✅' : '❌'}
+• Platform Authenticator: ${support.platformAuthenticatorSupported ? '✅' : '❌'}
+• Resident Keys: ${supportsResidentKeys ? '✅' : '❌'}
+• Has Credentials: ${hasCredentials ? '✅' : '❌'}
+• Origin: ${window.location.origin}
+• RP ID: ${window.location.hostname}
+    `.trim());
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-2xl mx-auto">
         <div className="bg-white shadow rounded-lg p-6">
           <h1 className="text-2xl font-bold text-gray-900 mb-6">
-            WebAuthn Test & Debug
+            Native WebAuthn Test & Debug
           </h1>
 
           <div className="space-y-4">
             <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-              <h3 className="text-sm font-medium text-blue-800 mb-2">Current Configuration</h3>
+              <h3 className="text-sm font-medium text-blue-800 mb-2">Native WebAuthn Configuration</h3>
               <ul className="text-sm text-blue-700 space-y-1">
+                <li>• Implementation: Native browser WebAuthn APIs</li>
+                <li>• Resident Keys: Required (enforced)</li>
+                <li>• User Verification: Required</li>
+                <li>• Attestation: Direct</li>
+                <li>• Allow Credentials: Empty (discoverable)</li>
                 <li>• Origin: {window.location.origin}</li>
-                <li>• RP ID: localhost</li>
-                <li>• Expected: Resident keys with discoverable credentials</li>
-                <li>• Browser: {navigator.userAgent.split(' ').pop()}</li>
+                <li>• RP ID: {window.location.hostname}</li>
               </ul>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <button
+                onClick={testSupport}
+                disabled={isLoading}
+                className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded disabled:opacity-50"
+              >
+                Test Support
+              </button>
+
               <button
                 onClick={testRegistration}
                 disabled={isLoading}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded disabled:opacity-50"
               >
-                {isLoading ? 'Testing...' : '🆕 Test Registration'}
+                Test Registration
               </button>
 
               <button
                 onClick={testLogin}
                 disabled={isLoading}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
+                className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded disabled:opacity-50"
               >
-                {isLoading ? 'Testing...' : '🔐 Test Login'}
+                Test Login
               </button>
 
               <button
                 onClick={clearCredentials}
                 disabled={isLoading}
-                className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50"
+                className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded disabled:opacity-50"
               >
-                🗑️ Clear Credentials
+                Clear Credentials
               </button>
             </div>
 
-            {result && (
-              <div className={`mt-6 p-4 rounded-md ${
-                result.includes('✅') 
-                  ? 'bg-green-50 border border-green-200 text-green-800'
-                  : result.includes('❌')
-                  ? 'bg-red-50 border border-red-200 text-red-800'
-                  : 'bg-yellow-50 border border-yellow-200 text-yellow-800'
-              }`}>
-                <pre className="whitespace-pre-wrap text-sm font-mono">{result}</pre>
+            {isLoading && (
+              <div className="flex items-center justify-center py-4">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <span className="ml-2 text-gray-600">Testing...</span>
               </div>
             )}
 
-            <div className="mt-6 bg-gray-50 border border-gray-200 rounded-md p-4">
-              <h3 className="text-sm font-medium text-gray-800 mb-2">Debugging Tips</h3>
-              <ul className="text-sm text-gray-600 space-y-1">
-                <li>1. Open browser console to see detailed logs</li>
-                <li>2. Try registration first, then login after a few seconds</li>
-                <li>3. Check if your password manager shows the new credential</li>
-                <li>4. Try refreshing the page and testing login again</li>
-                <li>5. Ensure you're using the same browser/device for both operations</li>
+            {result && (
+              <div className="bg-gray-100 border rounded-md p-4">
+                <h3 className="text-sm font-medium text-gray-800 mb-2">Result:</h3>
+                <pre className="text-sm text-gray-700 whitespace-pre-wrap font-mono">
+                  {result}
+                </pre>
+              </div>
+            )}
+
+            <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
+              <h3 className="text-sm font-medium text-yellow-800 mb-2">Testing Notes</h3>
+              <ul className="text-sm text-yellow-700 space-y-1">
+                <li>• Registration creates a resident key that should appear in your password manager</li>
+                <li>• Login uses discoverable credentials (no username required)</li>
+                <li>• Check browser console for detailed WebAuthn logs</li>
+                <li>• Try logging out and back in to test the full flow</li>
               </ul>
             </div>
           </div>

@@ -4,8 +4,10 @@ import { useUser } from '../hooks/useUser';
 import { useChannels } from '../hooks/useChannels';
 import { useAuth } from '../hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
-import { LoginForm } from './LoginForm';
-import type { ChannelMembershipWithChannel } from '../services/auth';
+import { PasskeyLoginForm } from './PasskeyLoginForm';
+import type { components } from '../types/api';
+
+type ChannelMembershipWithChannel = components['schemas']['ChannelMembershipWithChannel'];
 
 // Setup status query
 const useSetupStatus = () => {
@@ -52,7 +54,7 @@ export const Layout: FC<LayoutProps> = ({ children }) => {
   }
 
   if (!isAuthenticated) {
-    return <LoginForm />;
+    return <PasskeyLoginForm />;
   }
 
   return (

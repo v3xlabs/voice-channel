@@ -1,8 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { FC, useState, useEffect } from 'react';
 import { Shield, Users, CheckCircle, AlertCircle } from 'lucide-react';
-import { startRegistration } from '@simplewebauthn/browser';
 import { useNavigate } from '@tanstack/react-router';
+import { webAuthnService, WebAuthnUtils } from '../services/webauthn';
 
 interface SetupStatus {
   setup_required: boolean;
@@ -68,17 +68,45 @@ const SetupPage: FC = () => {
       const beginData = await beginResponse.json();
       console.log('📡 Bootstrap begin response:', beginData);
 
-      // Step 2: Create WebAuthn credential
-      const credential = await startRegistration(beginData.options.publicKey || beginData.options);
-      console.log('✅ WebAuthn credential created for admin');
+      // Step 2: Create WebAuthn credential using native WebAuthn
+      const serverOptions = beginData.options.publicKey || beginData.options;
+      const challenge = serverOptions.challenge;
+      const user = serverOptions.user;
 
-      // Step 3: Finish registration
+      if (!challenge || !user) {
+        throw new Error('Invalid registration options from server');
+      }
+
+      const credential = await webAuthnService.register(
+        challenge,
+        user.id,
+        user.name,
+        user.displayName
+      );
+      console.log('✅ Native WebAuthn credential created for admin');
+
+      // Step 3: Convert credential to backend format
+      const backendCredential = {
+        id: credential.id,
+        rawId: WebAuthnUtils.bufferToBase64url(credential.rawId),
+        response: {
+          clientDataJSON: WebAuthnUtils.bufferToBase64url(credential.response.clientDataJSON),
+          attestationObject: credential.response.attestationObject 
+            ? WebAuthnUtils.bufferToBase64url(credential.response.attestationObject)
+            : undefined,
+        },
+        type: credential.type,
+        clientExtensionResults: credential.clientExtensionResults || {},
+        authenticatorAttachment: credential.authenticatorAttachment,
+      };
+
+      // Step 4: Finish registration
       const finishResponse = await fetch('/setup/register/finish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           challenge_id: beginData.challenge_id,
-          credential,
+          credential: backendCredential,
         }),
       });
 

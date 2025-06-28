@@ -1,13 +1,26 @@
 import { FC } from 'react';
 import { useAdmin } from '../hooks/useAdmin';
+import { InvitationManager } from '../components/admin/InvitationManager';
+import { UserManager } from '../components/admin/UserManager';
 
 export const AdminPage: FC = () => {
   const {
     instanceSettings,
-    registrationStatus,
     isLoading,
     error,
+    isAdmin,
   } = useAdmin();
+
+  if (!isAdmin) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-gray-900 text-white">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold mb-4">Access Denied</h2>
+          <p className="text-gray-400">You need admin privileges to access this page.</p>
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -33,36 +46,49 @@ export const AdminPage: FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-8">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold mb-8">Admin Panel</h1>
+      <div className="max-w-7xl mx-auto">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold mb-2">Admin Panel</h1>
+          <p className="text-gray-400">Manage your voice channel instance</p>
+        </div>
         
-        <div className="grid gap-6">
-          {/* Instance Settings */}
+        <div className="space-y-8">
+          {/* Instance Settings Overview */}
           <div className="bg-gray-800 rounded-lg p-6">
-            <h2 className="text-xl font-semibold mb-4">Instance Settings</h2>
-                         {instanceSettings ? (
-               <div className="space-y-2">
-                 <p><strong>Instance Name:</strong> {instanceSettings.instance_name}</p>
-                 <p><strong>Registration Mode:</strong> {instanceSettings.registration_mode}</p>
-                 <p><strong>Invite Permission:</strong> {instanceSettings.invite_permission}</p>
-               </div>
-             ) : (
-               <p className="text-gray-400">No settings available</p>
-             )}
+            <h2 className="text-xl font-semibold mb-4">Instance Overview</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-gray-700 rounded-lg p-4">
+                <div className="text-sm text-gray-400">Instance Name</div>
+                <div className="text-lg font-medium">
+                  {instanceSettings?.instance_name || 'Voice Channel'}
+                </div>
+              </div>
+              <div className="bg-gray-700 rounded-lg p-4">
+                <div className="text-sm text-gray-400">Registration Mode</div>
+                <div className="text-lg font-medium capitalize">
+                  {instanceSettings?.registration_mode?.replace('_', ' ') || 'Invite Only'}
+                </div>
+              </div>
+              <div className="bg-gray-700 rounded-lg p-4">
+                <div className="text-sm text-gray-400">Invite Permission</div>
+                <div className="text-lg font-medium capitalize">
+                  {instanceSettings?.invite_permission?.replace('_', ' ') || 'Admin Only'}
+                </div>
+              </div>
+              <div className="bg-gray-700 rounded-lg p-4">
+                <div className="text-sm text-gray-400">Status</div>
+                <div className="text-lg font-medium text-green-400">
+                  Active
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* Registration Status */}
-          <div className="bg-gray-800 rounded-lg p-6">
-            <h2 className="text-xl font-semibold mb-4">Registration Status</h2>
-                         {registrationStatus ? (
-               <div className="space-y-2">
-                 <p><strong>Status:</strong> Available</p>
-                 <p><strong>Data:</strong> {JSON.stringify(registrationStatus)}</p>
-               </div>
-             ) : (
-               <p className="text-gray-400">No registration data available</p>
-             )}
-          </div>
+          {/* Invitation Management */}
+          <InvitationManager />
+
+          {/* User Management */}
+          <UserManager />
         </div>
       </div>
     </div>

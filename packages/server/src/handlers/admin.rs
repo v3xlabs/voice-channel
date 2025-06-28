@@ -103,7 +103,7 @@ impl AdminApi {
             ));
         }
 
-        let invitation = Invitation::create(&pool, &instance_fqdn, user_id.0, request.0)
+        let invitation = Invitation::create(&pool, user_id.0, instance_fqdn.0, request.0)
             .await
             .map_err(|e| poem::Error::from_string(e.to_string(), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?;
 
@@ -220,5 +220,33 @@ impl AdminApi {
         } else {
             Ok(Json(None))
         }
+    }
+
+    /// Get all users for instance (admin only)
+    #[oai(path = "/admin/users", method = "get", tag = "AdminApiTags::Admin")]
+    async fn get_instance_users(
+        &self,
+        pool: Data<&PgPool>,
+        instance_fqdn: Query<String>,
+        admin_user_id: Query<Uuid>,
+    ) -> Result<Json<Vec<User>>, poem::Error> {
+        // Verify user is admin
+        let user = User::find_by_id(&pool, admin_user_id.0)
+            .await
+            .map_err(|e| poem::Error::from_string(e.to_string(), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?
+            .ok_or_else(|| poem::Error::from_string("User not found", poem::http::StatusCode::NOT_FOUND))?;
+
+        if !user.is_admin || user.instance_fqdn != instance_fqdn.0 {
+            return Err(poem::Error::from_string(
+                "Admin access required for this instance",
+                poem::http::StatusCode::FORBIDDEN,
+            ));
+        }
+
+        let users = User::list_by_instance(&pool, &instance_fqdn)
+            .await
+            .map_err(|e| poem::Error::from_string(e.to_string(), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?;
+
+        Ok(Json(users))
     }
 } 

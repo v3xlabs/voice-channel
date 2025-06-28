@@ -15,6 +15,7 @@ import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as ChannelNameRouteImport } from './routes/$channelName'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as InviteCodeRouteImport } from './routes/invite/$code'
 import { Route as InstanceFqdnChannelNameRouteImport } from './routes/$instanceFqdn/$channelName'
 import { Route as GroupNameChannelNameRouteImport } from './routes/$groupName/$channelName'
 import { Route as InstanceFqdnGroupNameChannelNameRouteImport } from './routes/$instanceFqdn/$groupName/$channelName'
@@ -49,6 +50,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const InviteCodeRoute = InviteCodeRouteImport.update({
+  id: '/invite/$code',
+  path: '/invite/$code',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const InstanceFqdnChannelNameRoute = InstanceFqdnChannelNameRouteImport.update({
   id: '/$instanceFqdn/$channelName',
   path: '/$instanceFqdn/$channelName',
@@ -75,6 +81,7 @@ export interface FileRoutesByFullPath {
   '/test-auth': typeof TestAuthRoute
   '/$groupName/$channelName': typeof GroupNameChannelNameRoute
   '/$instanceFqdn/$channelName': typeof InstanceFqdnChannelNameRoute
+  '/invite/$code': typeof InviteCodeRoute
   '/$instanceFqdn/$groupName/$channelName': typeof InstanceFqdnGroupNameChannelNameRoute
 }
 export interface FileRoutesByTo {
@@ -86,6 +93,7 @@ export interface FileRoutesByTo {
   '/test-auth': typeof TestAuthRoute
   '/$groupName/$channelName': typeof GroupNameChannelNameRoute
   '/$instanceFqdn/$channelName': typeof InstanceFqdnChannelNameRoute
+  '/invite/$code': typeof InviteCodeRoute
   '/$instanceFqdn/$groupName/$channelName': typeof InstanceFqdnGroupNameChannelNameRoute
 }
 export interface FileRoutesById {
@@ -98,6 +106,7 @@ export interface FileRoutesById {
   '/test-auth': typeof TestAuthRoute
   '/$groupName/$channelName': typeof GroupNameChannelNameRoute
   '/$instanceFqdn/$channelName': typeof InstanceFqdnChannelNameRoute
+  '/invite/$code': typeof InviteCodeRoute
   '/$instanceFqdn/$groupName/$channelName': typeof InstanceFqdnGroupNameChannelNameRoute
 }
 export interface FileRouteTypes {
@@ -111,6 +120,7 @@ export interface FileRouteTypes {
     | '/test-auth'
     | '/$groupName/$channelName'
     | '/$instanceFqdn/$channelName'
+    | '/invite/$code'
     | '/$instanceFqdn/$groupName/$channelName'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -122,6 +132,7 @@ export interface FileRouteTypes {
     | '/test-auth'
     | '/$groupName/$channelName'
     | '/$instanceFqdn/$channelName'
+    | '/invite/$code'
     | '/$instanceFqdn/$groupName/$channelName'
   id:
     | '__root__'
@@ -133,6 +144,7 @@ export interface FileRouteTypes {
     | '/test-auth'
     | '/$groupName/$channelName'
     | '/$instanceFqdn/$channelName'
+    | '/invite/$code'
     | '/$instanceFqdn/$groupName/$channelName'
   fileRoutesById: FileRoutesById
 }
@@ -145,6 +157,7 @@ export interface RootRouteChildren {
   TestAuthRoute: typeof TestAuthRoute
   GroupNameChannelNameRoute: typeof GroupNameChannelNameRoute
   InstanceFqdnChannelNameRoute: typeof InstanceFqdnChannelNameRoute
+  InviteCodeRoute: typeof InviteCodeRoute
   InstanceFqdnGroupNameChannelNameRoute: typeof InstanceFqdnGroupNameChannelNameRoute
 }
 
@@ -192,6 +205,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/invite/$code': {
+      id: '/invite/$code'
+      path: '/invite/$code'
+      fullPath: '/invite/$code'
+      preLoaderRoute: typeof InviteCodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/$instanceFqdn/$channelName': {
       id: '/$instanceFqdn/$channelName'
       path: '/$instanceFqdn/$channelName'
@@ -225,6 +245,7 @@ const rootRouteChildren: RootRouteChildren = {
   TestAuthRoute: TestAuthRoute,
   GroupNameChannelNameRoute: GroupNameChannelNameRoute,
   InstanceFqdnChannelNameRoute: InstanceFqdnChannelNameRoute,
+  InviteCodeRoute: InviteCodeRoute,
   InstanceFqdnGroupNameChannelNameRoute: InstanceFqdnGroupNameChannelNameRoute,
 }
 export const routeTree = rootRouteImport

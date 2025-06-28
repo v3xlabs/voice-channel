@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "dev:openapi": "openapi-typescript http://localhost:3001/openapi.json -o src/types/api.ts --watch",
+    "dev:openapi": "openapi-typescript http://localhost:3001/openapi.json --output ./src/schema.gen.ts",
     "build": "tsc && vite build",
     "lint": "eslint . --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",

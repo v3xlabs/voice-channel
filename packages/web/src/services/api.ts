@@ -1,9 +1,5 @@
 import { createFetch } from 'openapi-hooks';
-import type { components, paths } from '../types/api';
-
-// The paths type needs to be extended to satisfy the Paths constraint
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type ExtendedPaths = paths & { [key: string]: any };
+import type { components, paths } from '../schema.gen';
 
 // Token management
 const TOKEN_KEY = 'voice-channel-token';
@@ -27,7 +23,7 @@ export const tokenManager = {
 };
 
 // Create base fetch without token injection
-const baseFetch = createFetch<ExtendedPaths>({
+const baseFetch = createFetch<paths>({
   baseUrl: location.origin + '/api/',
   onError: (error: unknown) => {
     console.error('API Error:', error);

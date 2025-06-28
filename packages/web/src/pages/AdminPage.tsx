@@ -6,8 +6,6 @@ import { UserManager } from '../components/admin/UserManager';
 export const AdminPage: FC = () => {
   const {
     instanceSettings,
-    isLoading,
-    error,
     isAdmin,
   } = useAdmin();
 
@@ -22,7 +20,7 @@ export const AdminPage: FC = () => {
     );
   }
 
-  if (isLoading) {
+  if (instanceSettings.isLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-900 text-white">
         <div className="text-center">
@@ -33,12 +31,12 @@ export const AdminPage: FC = () => {
     );
   }
 
-  if (error) {
+  if (instanceSettings.error) {
     return (
       <div className="flex h-screen items-center justify-center bg-gray-900 text-white">
         <div className="text-center">
           <h2 className="text-2xl font-bold mb-4">Error Loading Admin Panel</h2>
-          <p className="text-gray-400">{error.message}</p>
+          <p className="text-gray-400">{instanceSettings.error.message}</p>
         </div>
       </div>
     );
@@ -60,19 +58,19 @@ export const AdminPage: FC = () => {
               <div className="bg-gray-700 rounded-lg p-4">
                 <div className="text-sm text-gray-400">Instance Name</div>
                 <div className="text-lg font-medium">
-                  {instanceSettings?.instance_name || 'Voice Channel'}
+                  {instanceSettings.data?.instance_name || 'Voice Channel'}
                 </div>
               </div>
               <div className="bg-gray-700 rounded-lg p-4">
                 <div className="text-sm text-gray-400">Registration Mode</div>
                 <div className="text-lg font-medium capitalize">
-                  {instanceSettings?.registration_mode?.replace('_', ' ') || 'Invite Only'}
+                  {instanceSettings.data?.registration_mode?.replace('_', ' ') || 'Invite Only'}
                 </div>
               </div>
               <div className="bg-gray-700 rounded-lg p-4">
                 <div className="text-sm text-gray-400">Invite Permission</div>
                 <div className="text-lg font-medium capitalize">
-                  {instanceSettings?.invite_permission?.replace('_', ' ') || 'Admin Only'}
+                  {instanceSettings.data?.invite_permission?.replace('_', ' ') || 'Admin Only'}
                 </div>
               </div>
               <div className="bg-gray-700 rounded-lg p-4">

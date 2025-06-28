@@ -26,20 +26,19 @@ impl AdminApi {
     #[oai(path = "/admin/settings", method = "get", tag = "AdminApiTags::Admin")]
     async fn get_instance_settings(
         &self,
-        instance_fqdn: Query<String>,
     ) -> Result<Json<InstanceSettings>, poem::Error> {
-        let settings = InstanceSettings::get_by_fqdn(&self.state.db.pool, &instance_fqdn)
+        let settings = InstanceSettings::get_by_fqdn(&self.state.db.pool, &self.state.config.instance_fqdn)
             .await
             .map_err(|e| poem::Error::from_string(e.to_string(), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?
             .unwrap_or_else(|| {
                 // For now, return a default - in production, create one in DB
                 InstanceSettings {
                     settings_id: Uuid::new_v4(),
-                    instance_fqdn: instance_fqdn.to_string(),
+                    instance_fqdn: self.state.config.instance_fqdn.clone(),
                     registration_mode: "invite_only".to_string(),
                     invite_permission: "admin_only".to_string(),
                     invite_limit: None,
-                    instance_name: format!("{} Voice Channel", instance_fqdn.0),
+                    instance_name: format!("{} Voice Channel", self.state.config.instance_fqdn),
                     instance_description: None,
                     created_at: chrono::Utc::now(),
                     updated_at: chrono::Utc::now(),
@@ -53,7 +52,6 @@ impl AdminApi {
     #[oai(path = "/admin/settings", method = "patch", tag = "AdminApiTags::Admin")]
     async fn update_instance_settings(
         &self,
-        instance_fqdn: Query<String>,
         admin_user_id: Query<Uuid>, // In real implementation, this would come from auth middleware
         updates: Json<UpdateInstanceSettingsRequest>,
     ) -> Result<Json<InstanceSettings>, poem::Error> {
@@ -70,14 +68,14 @@ impl AdminApi {
             ));
         }
 
-        if user.instance_fqdn != instance_fqdn.0 {
+        if user.instance_fqdn != self.state.config.instance_fqdn {
             return Err(poem::Error::from_string(
                 "Can only modify settings for your own instance",
                 poem::http::StatusCode::FORBIDDEN,
             ));
         }
 
-        let settings = InstanceSettings::update(&self.state.db.pool, &instance_fqdn, updates.0)
+        let settings = InstanceSettings::update(&self.state.db.pool, &self.state.config.instance_fqdn, updates.0)
             .await
             .map_err(|e| poem::Error::from_string(e.to_string(), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?;
 
@@ -88,12 +86,11 @@ impl AdminApi {
     #[oai(path = "/admin/invitations", method = "post", tag = "AdminApiTags::Admin")]
     async fn create_invitation(
         &self,
-        instance_fqdn: Query<String>,
         user_id: Query<Uuid>, // In real implementation, this would come from auth middleware
         request: Json<CreateInvitationRequest>,
     ) -> Result<Json<Invitation>, poem::Error> {
         // Check if user can create invitations
-        let can_invite = InstanceSettings::can_user_create_invitation(&self.state.db.pool, user_id.0, &instance_fqdn)
+        let can_invite = InstanceSettings::can_user_create_invitation(&self.state.db.pool, user_id.0, &self.state.config.instance_fqdn)
             .await
             .map_err(|e| poem::Error::from_string(e.to_string(), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?;
 
@@ -104,7 +101,7 @@ impl AdminApi {
             ));
         }
 
-        let invitation = Invitation::create(&self.state.db.pool, user_id.0, instance_fqdn.0, request.0)
+        let invitation = Invitation::create(&self.state.db.pool, user_id.0, self.state.config.instance_fqdn.clone(), request.0)
             .await
             .map_err(|e| poem::Error::from_string(e.to_string(), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?;
 
@@ -128,7 +125,6 @@ impl AdminApi {
     #[oai(path = "/admin/invitations", method = "get", tag = "AdminApiTags::Admin")]
     async fn get_instance_invitations(
         &self,
-        instance_fqdn: Query<String>,
         admin_user_id: Query<Uuid>,
     ) -> Result<Json<Vec<InvitationWithCreator>>, poem::Error> {
         // Verify user is admin
@@ -137,14 +133,14 @@ impl AdminApi {
             .map_err(|e| poem::Error::from_string(e.to_string(), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?
             .ok_or_else(|| poem::Error::from_string("User not found", poem::http::StatusCode::NOT_FOUND))?;
 
-        if !user.is_admin || user.instance_fqdn != instance_fqdn.0 {
+        if !user.is_admin || user.instance_fqdn != self.state.config.instance_fqdn {
             return Err(poem::Error::from_string(
                 "Admin access required for this instance",
                 poem::http::StatusCode::FORBIDDEN,
             ));
         }
 
-        let invitations = Invitation::get_by_instance_with_creator(&self.state.db.pool, &instance_fqdn)
+        let invitations = Invitation::get_by_instance_with_creator(&self.state.db.pool, &self.state.config.instance_fqdn)
             .await
             .map_err(|e| poem::Error::from_string(e.to_string(), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?;
 
@@ -221,7 +217,6 @@ impl AdminApi {
     #[oai(path = "/admin/users", method = "get", tag = "AdminApiTags::Admin")]
     async fn get_instance_users(
         &self,
-        instance_fqdn: Query<String>,
         admin_user_id: Query<Uuid>,
     ) -> Result<Json<Vec<User>>, poem::Error> {
         // Verify user is admin
@@ -230,14 +225,14 @@ impl AdminApi {
             .map_err(|e| poem::Error::from_string(e.to_string(), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?
             .ok_or_else(|| poem::Error::from_string("User not found", poem::http::StatusCode::NOT_FOUND))?;
 
-        if !user.is_admin || user.instance_fqdn != instance_fqdn.0 {
+        if !user.is_admin || user.instance_fqdn != self.state.config.instance_fqdn {
             return Err(poem::Error::from_string(
                 "Admin access required for this instance",
                 poem::http::StatusCode::FORBIDDEN,
             ));
         }
 
-        let users = User::list_by_instance(&self.state.db.pool, &instance_fqdn)
+        let users = User::list_by_instance(&self.state.db.pool, &self.state.config.instance_fqdn)
             .await
             .map_err(|e| poem::Error::from_string(e.to_string(), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?;
 

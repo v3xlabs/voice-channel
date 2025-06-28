@@ -972,9 +972,7 @@ export interface paths {
         /** Get instance settings */
         get: {
             parameters: {
-                query: {
-                    instance_fqdn: string;
-                };
+                query?: never;
                 header?: never;
                 path?: never;
                 cookie?: never;
@@ -1000,7 +998,6 @@ export interface paths {
         patch: {
             parameters: {
                 query: {
-                    instance_fqdn: string;
                     admin_user_id: string;
                 };
                 header?: never;
@@ -1036,7 +1033,6 @@ export interface paths {
         get: {
             parameters: {
                 query: {
-                    instance_fqdn: string;
                     admin_user_id: string;
                 };
                 header?: never;
@@ -1060,7 +1056,6 @@ export interface paths {
         post: {
             parameters: {
                 query: {
-                    instance_fqdn: string;
                     user_id: string;
                 };
                 header?: never;
@@ -1291,7 +1286,6 @@ export interface paths {
         get: {
             parameters: {
                 query: {
-                    instance_fqdn: string;
                     admin_user_id: string;
                 };
                 header?: never;

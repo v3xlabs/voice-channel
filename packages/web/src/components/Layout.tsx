@@ -5,7 +5,7 @@ import { useChannels } from '../hooks/useChannels';
 import { useAuth } from '../hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
 import { PasskeyLoginForm } from './PasskeyLoginForm';
-import type { components } from '../types/api';
+import type { components } from '../schema.gen';
 
 type ChannelMembershipWithChannel = components['schemas']['ChannelMembershipWithChannel'];
 
@@ -138,7 +138,7 @@ export const Layout: FC<LayoutProps> = ({ children }) => {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col pb-8 overflow-y-auto">
         {children}
       </div>
     </div>

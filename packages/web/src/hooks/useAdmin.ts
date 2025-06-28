@@ -9,12 +9,7 @@ type UpdateInstanceSettingsRequest = components['schemas']['UpdateInstanceSettin
 const getInstanceSettings = () => queryOptions({
   queryKey: ['auth', 'admin', 'instance_settings'],
   queryFn: async () => {
-    const result = await apiFetch('/admin/settings', 'get', {
-      query: {
-        instance_fqdn: 'localhost', // TODO: Get from config
-        admin_user_id: 'current_user_id' // TODO: Get from auth context
-      }
-    });
+    const result = await apiFetch('/admin/settings', 'get', {});
     return result.data;
   }
 });
@@ -33,7 +28,6 @@ const getUsers = () => queryOptions({
   queryFn: async () => {
     const result = await apiFetch('/admin/users', 'get', {
       query: {
-        instance_fqdn: 'localhost', // TODO: Get from config
         admin_user_id: 'current_user_id' // TODO: Get from auth context
       }
     });
@@ -55,7 +49,6 @@ const getInvitations = () => queryOptions({
   queryFn: async () => {
     const result = await apiFetch('/admin/invitations', 'get', {
       query: {
-        instance_fqdn: 'localhost', // TODO: Get from config
         admin_user_id: 'current_user_id' // TODO: Get from auth context
       }
     });
@@ -101,7 +94,6 @@ export const useAdmin = () => {
     mutationFn: async (settings: UpdateInstanceSettingsRequest) => {
       const result = await apiFetch('/admin/settings', 'patch', {
         query: {
-          instance_fqdn: 'localhost', // TODO: Get from config
           admin_user_id: 'current_user_id' // TODO: Get from auth context
         },
         contentType: 'application/json; charset=utf-8',
@@ -118,9 +110,9 @@ export const useAdmin = () => {
     mutationFn: async (requestData: CreateInvitationRequest) => {
       const result = await apiFetch('/admin/invitations', 'post', {
         query: {
-          instance_fqdn: 'localhost', // TODO: Get from config
           user_id: 'current_user_id' // TODO: Get from auth context
         },
+        contentType: 'application/json; charset=utf-8',
         data: requestData
       });
       return result.data;
@@ -134,7 +126,7 @@ export const useAdmin = () => {
   const deactivateInvitationMutation = useMutation({
     mutationFn: async (invitationId: string) => {
       const result = await apiFetch('/admin/invitations/{invitation_id}/deactivate', 'post', {
-        params: { invitation_id: invitationId },
+        path: { invitation_id: invitationId },
         query: {
           _user_id: 'current_user_id' // TODO: Get from auth context
         }
@@ -150,7 +142,7 @@ export const useAdmin = () => {
   const deleteInvitationMutation = useMutation({
     mutationFn: async (invitationId: string) => {
       const result = await apiFetch('/admin/invitations/{invitation_id}', 'delete', {
-        params: { invitation_id: invitationId },
+        path: { invitation_id: invitationId },
         query: {
           _user_id: 'current_user_id' // TODO: Get from auth context
         }

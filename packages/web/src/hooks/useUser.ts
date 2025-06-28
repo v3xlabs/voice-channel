@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient, queryOptions } from '@tanstack/react-query';
 import { useAuthContext } from '../contexts/AuthContext';
 import { apiFetch } from '../services/api';
-import type { components } from '../types/api';
+import type { components } from '../schema.gen';
 
 type User = components['schemas']['User'];
 type UpdateUserRequest = components['schemas']['UpdateUserRequest'];

@@ -1,6 +1,6 @@
 import { useQuery, queryOptions } from '@tanstack/react-query';
 import { apiFetch } from '../services/api';
-import type { components } from '../types/api';
+import type { components } from '../schema.gen';
 
 type Invitation = components['schemas']['Invitation'];
 

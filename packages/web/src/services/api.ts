@@ -1,5 +1,5 @@
 import { createFetch } from 'openapi-hooks';
-import type { paths } from '../types/api';
+import type { components, paths } from '../types/api';
 
 // The paths type needs to be extended to satisfy the Paths constraint
 type ExtendedPaths = paths & { [key: string]: any };
@@ -66,16 +66,7 @@ export const apiFetch: typeof baseFetch = (path, method, options) => {
 export type { paths };
 
 // Define types that the frontend expects
-export interface Channel {
-  channel_id: string;
-  name: string;
-  description?: string;
-  max_participants: number;
-  current_participants: number;
-  created_at: string;
-  instance_fqdn: string;
-  group_id: string;
-}
+export type Channel = components['schemas']['Channel'];
 
 export interface CreateChannelRequest {
   name: string;

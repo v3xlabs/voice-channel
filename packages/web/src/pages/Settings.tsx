@@ -1,11 +1,12 @@
 import { FC, useState, useEffect } from 'react';
 import { User, Settings as SettingsIcon, LogOut, Shield } from 'lucide-react';
-import { Link } from '@tanstack/react-router';
+import { Link, useNavigate } from '@tanstack/react-router';
 import classnames from 'classnames';
 import { useUser } from '../hooks/useUser';
 import { useAuth } from '../hooks/useAuth';
 
 export const Settings: FC = () => {
+  const navigate = useNavigate();
   const { user, isLoading, updateUser, isUpdatingUser } = useUser();
   const { logout } = useAuth();
   const [displayName, setDisplayName] = useState('');
@@ -39,7 +40,7 @@ export const Settings: FC = () => {
 
   const handleLogout = () => {
     logout();
-    window.location.href = '/';
+    navigate({ to: '/' });
   };
 
   if (isLoading) {
@@ -104,13 +105,13 @@ export const Settings: FC = () => {
               
               {user.is_admin && (
                 <div className="bg-gray-800 rounded-lg p-2">
-                  <a
-                    href="/admin"
+                  <Link
+                    to="/admin"
                     className="flex items-center space-x-3 px-3 py-2 text-gray-300 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
                   >
                     <Shield className="w-4 h-4" />
                     <span className="text-sm font-medium">Admin Panel</span>
-                  </a>
+                  </Link>
                 </div>
               )}
             </nav>

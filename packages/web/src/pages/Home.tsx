@@ -1,14 +1,15 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient, queryOptions } from '@tanstack/react-query'
 import { Plus, Users, Clock } from 'lucide-react'
+import { Link } from '@tanstack/react-router'
 import { apiFetch, type CreateChannelRequest, type Channel } from '../services/api'
 
 const getPublicChannels = () => queryOptions({
   queryKey: ['public_channels'],
   async queryFn() {
-    // TODO: Implement proper channel listing with apiFetch
-    const channels: Channel[] = [];
-    return channels;
+    const response = await apiFetch('/channels', "get", {});
+
+    return response.data;
   },
   staleTime: 30 * 1000, // 30 seconds
 });
@@ -147,20 +148,20 @@ export const Home: React.FC = () => {
           const groupName = 'admin'; // Default to admin group for now
           const isAdminGroup = groupName === 'admin';
           const isLocalChannel = channel.instance_fqdn === window.location.hostname;
-          
+
           let channelRoute: string;
           if (isLocalChannel) {
             channelRoute = isAdminGroup ? `/${channel.name}` : `/${groupName}/${channel.name}`;
           } else {
-            channelRoute = isAdminGroup 
-              ? `/${channel.instance_fqdn}/${channel.name}` 
+            channelRoute = isAdminGroup
+              ? `/${channel.instance_fqdn}/${channel.name}`
               : `/${channel.instance_fqdn}/${groupName}/${channel.name}`;
           }
-          
+
           return (
-            <a
+            <Link
               key={channel.channel_id}
-              href={channelRoute}
+              to={channelRoute}
               className="bg-gray-800 flex rounded-lg p-6 border border-gray-700 hover:border-primary-500 transition-colors group flex-col"
             >
               <div className="flex items-start justify-between mb-4">
@@ -188,7 +189,7 @@ export const Home: React.FC = () => {
                   {channel.instance_fqdn}
                 </span>
               </div>
-            </a>
+            </Link>
           );
         })}
       </div>

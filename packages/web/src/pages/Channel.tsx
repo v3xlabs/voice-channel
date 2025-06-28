@@ -1,10 +1,11 @@
-import { useParams } from '@tanstack/react-router'
+import { useParams, useNavigate } from '@tanstack/react-router'
 import { useEffect, useRef } from 'react'
 import { Mic, MicOff, Video, VideoOff, Phone, PhoneOff, Settings, Users, AlertCircle } from 'lucide-react'
 import { useChannelCall } from '../hooks/useChannelCall'
 import { useUser } from '../hooks/useUser'
 
 export const Channel: React.FC = () => {
+  const navigate = useNavigate()
   const params = useParams({ strict: false })
   const { channelName, instanceFqdn } = params
   const groupName = (params as any).groupName // TODO: Update when route tree is regenerated
@@ -43,7 +44,7 @@ export const Channel: React.FC = () => {
           <h2 className="text-2xl font-bold mb-4">Authentication Required</h2>
           <p className="text-gray-400 mb-6">You need to be logged in to join voice channels.</p>
           <button
-            onClick={() => window.location.href = '/'}
+            onClick={() => navigate({ to: '/' })}
             className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg font-semibold"
           >
             Go to Login

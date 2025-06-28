@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { FC, useState, useEffect } from 'react';
 import { Shield, Users, CheckCircle, AlertCircle } from 'lucide-react';
 import { startRegistration } from '@simplewebauthn/browser';
+import { useNavigate } from '@tanstack/react-router';
 
 interface SetupStatus {
   setup_required: boolean;
@@ -10,6 +11,7 @@ interface SetupStatus {
 }
 
 const SetupPage: FC = () => {
+  const navigate = useNavigate();
   const [setupStatus, setSetupStatus] = useState<SetupStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreatingAdmin, setIsCreatingAdmin] = useState(false);
@@ -27,7 +29,7 @@ const SetupPage: FC = () => {
         
         // If setup is not required, redirect to home
         if (!data.setup_required) {
-          window.location.href = '/';
+          navigate({ to: '/' });
           return;
         }
       } catch (error) {
@@ -93,7 +95,7 @@ const SetupPage: FC = () => {
          
          // Redirect to home after a short delay
          setTimeout(() => {
-           window.location.href = '/';
+           navigate({ to: '/' });
          }, 2000);
        } else {
          throw new Error(finishData.message || 'Bootstrap setup failed');

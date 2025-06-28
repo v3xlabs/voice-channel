@@ -30,7 +30,7 @@ pub struct Api {
 }
 
 #[derive(Tags)]
-enum ApiTags {
+pub enum ApiTags {
     /// Channel management
     Channels,
     /// WebRTC and media routing endpoints
@@ -39,6 +39,8 @@ enum ApiTags {
     Auth,
     /// Instance administration
     Admin,
+    /// Bootstrap setup for new instances
+    Setup,
 }
 
 #[OpenApi]

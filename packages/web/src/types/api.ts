@@ -1236,9 +1236,7 @@ export interface components {
             user_id: string;
         };
         /** LoginBeginRequest */
-        LoginBeginRequest: {
-            username?: string;
-        };
+        LoginBeginRequest: Record<string, never>;
         /** LoginBeginResponse */
         LoginBeginResponse: {
             challenge_id: string;

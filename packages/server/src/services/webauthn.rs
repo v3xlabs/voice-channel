@@ -26,6 +26,20 @@ pub struct WebAuthnService {
     authentication_sessions: RwLock<HashMap<String, DiscoverableAuthentication>>,
 }
 
+impl Clone for WebAuthnService {
+    fn clone(&self) -> Self {
+        // Create new session storage for the clone
+        Self {
+            webauthn: self.webauthn.clone(),
+            instance_fqdn: self.instance_fqdn.clone(),
+            origin: self.origin.clone(),
+            rp_id: self.rp_id.clone(),
+            registration_sessions: RwLock::new(HashMap::new()),
+            authentication_sessions: RwLock::new(HashMap::new()),
+        }
+    }
+}
+
 impl WebAuthnService {
     pub fn new(origin: &str, rp_id: &str, instance_fqdn: String) -> Result<Self> {
         let rp_origin = Url::parse(origin)
@@ -56,7 +70,7 @@ impl WebAuthnService {
 
     pub async fn register_begin(
         &self,
-        _pool: &PgPool,
+        pool: &PgPool,
         request: RegisterBeginRequest,
     ) -> Result<RegisterBeginResponse> {
         // Validate display name
@@ -68,15 +82,54 @@ impl WebAuthnService {
             return Err(anyhow!("Display name too long (max 100 characters)"));
         }
 
+        // Check registration mode (unless this is bootstrap - checked elsewhere)
+        let user_count = sqlx::query_scalar!("SELECT COUNT(*) FROM users")
+            .fetch_one(pool)
+            .await?
+            .unwrap_or(0);
+
+        if user_count > 0 {
+            // Not bootstrap - check registration mode
+            let settings = crate::models::instance_settings::InstanceSettings::get_by_fqdn(pool, &self.instance_fqdn)
+                .await?
+                .ok_or_else(|| anyhow!("Instance settings not found"))?;
+
+            match settings.registration_mode.as_str() {
+                "open" => {
+                    // Allow registration without invite
+                }
+                "invite_only" => {
+                    if request.invite_code.is_none() {
+                        return Err(anyhow!("Invitation code required for registration"));
+                    }
+                    // Validate invite code exists and is valid
+                    let invite_code = request.invite_code.as_ref().unwrap();
+                    let invitation = crate::models::invitation::Invitation::get_by_code(pool, invite_code)
+                        .await?
+                        .ok_or_else(|| anyhow!("Invalid invitation code"))?;
+                    
+                    if !invitation.is_valid() {
+                        return Err(anyhow!("Invitation code is expired or exhausted"));
+                    }
+                }
+                "closed" => {
+                    return Err(anyhow!("Registration is currently closed"));
+                }
+                _ => {
+                    return Err(anyhow!("Invalid registration mode configured"));
+                }
+            }
+        }
+
         // Generate a unique user ID for this registration attempt
         let user_id = Uuid::new_v4();
         
         tracing::info!(
-            "Starting WebAuthn registration for display_name='{}', user_id={}",
-            request.display_name, user_id
+            "Starting WebAuthn registration for display_name='{}', user_id={}, invite_code={:?}",
+            request.display_name, user_id, request.invite_code.is_some()
         );
         
-        // Start RESIDENT KEY registration (as requested by user)
+        // Start RESIDENT KEY registration (enforced)
         let (ccr, passkey_registration) = self.webauthn.start_passkey_registration(
             user_id,
             &request.display_name,
@@ -122,11 +175,19 @@ impl WebAuthnService {
         let passkey = self.webauthn.finish_passkey_registration(&reg, &passkey_registration)
             .map_err(|e| anyhow!("WebAuthn registration failed: {}", e))?;
 
-        // TODO: Validate invite code if provided
+        // Use invite code if provided
         if let Some(code) = &invite_code {
             tracing::info!("Registration using invite code: {}", code);
-            // Here you would validate the invite code against the database
-            // For now, we'll just log it
+            let invitation = crate::models::invitation::Invitation::get_by_code(pool, code)
+                .await
+                .map_err(|e| anyhow!("Database error while validating invite: {}", e))?
+                .ok_or_else(|| anyhow!("Invalid invitation code"))?;
+            
+            if !invitation.is_valid() {
+                return Err(anyhow!("Invitation code is expired or exhausted"));
+            }
+            
+            // Mark invitation as used (this will be done after successful user creation)
         }
 
         // Create the user
@@ -137,6 +198,20 @@ impl WebAuthnService {
         let user_auth = User::create(pool, create_user_request, self.instance_fqdn.clone()).await
             .map_err(|e| anyhow!("Failed to create user: {}", e))?;
 
+        // Check if this is the first user and make them admin
+        let user_count = sqlx::query_scalar!("SELECT COUNT(*) FROM users")
+            .fetch_one(pool)
+            .await?
+            .unwrap_or(0);
+
+        let final_user = if user_count == 1 {
+            // First user becomes admin
+            User::update_admin_status(pool, user_auth.user.user_id, true).await
+                .map_err(|e| anyhow!("Failed to grant admin privileges: {}", e))?
+        } else {
+            user_auth.user
+        };
+
         // Store the credential - convert credential ID to base64 string
         let credential_id = general_purpose::STANDARD.encode(passkey.cred_id());
         let public_key_bytes = bincode::serialize(&passkey)
@@ -144,7 +219,7 @@ impl WebAuthnService {
 
         crate::models::webauthn::UserCredential::store_credential(
             pool,
-            user_auth.user.user_id,
+            final_user.user_id,
             &credential_id,
             &public_key_bytes,
             0, // Start with counter 0 for new passkeys
@@ -152,13 +227,20 @@ impl WebAuthnService {
         ).await
         .map_err(|e| anyhow!("Failed to store credential: {}", e))?;
 
+        // Mark invitation as used if provided
+        if let Some(code) = &invite_code {
+            crate::models::invitation::Invitation::use_invitation(pool, code, final_user.user_id)
+                .await
+                .map_err(|e| anyhow!("Failed to mark invitation as used: {}", e))?;
+        }
+
         tracing::info!(
-            "WebAuthn registration completed successfully for user: {} ({})",
-            user_auth.user.username, user_auth.user.user_id
+            "WebAuthn registration completed successfully for user: {} ({}) - Admin: {}",
+            final_user.username, final_user.user_id, final_user.is_admin
         );
 
         Ok(RegisterFinishResponse {
-            user_id: user_auth.user.user_id,
+            user_id: final_user.user_id,
             success: true,
         })
     }

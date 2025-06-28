@@ -1,9 +1,9 @@
-import { FC, ReactNode } from 'react';
+import { FC, ReactNode, useEffect, useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import { useUser } from '../hooks/useUser';
 import { useChannels } from '../hooks/useChannels';
 import { LoginForm } from './LoginForm';
-import type { ChannelWithMembership } from '../services/auth';
+import type { ChannelMembershipWithChannel } from '../services/auth';
 
 interface LayoutProps {
   children: ReactNode;
@@ -16,8 +16,37 @@ export const Layout: FC<LayoutProps> = ({ children }) => {
     isLoading: channelsLoading, 
     leaveChannel 
   } = useChannels();
+  const [setupRequired, setSetupRequired] = useState<boolean | null>(null);
 
   const isLoading = userLoading || (isAuthenticated && channelsLoading);
+
+  // Check if setup is required (zero users)
+  useEffect(() => {
+    const checkSetupStatus = async () => {
+      try {
+        const response = await fetch('/setup/status');
+        const data = await response.json();
+        setSetupRequired(data.setup_required);
+        
+        // If setup is required, redirect to setup page
+        if (data.setup_required) {
+          window.location.href = '/setup';
+        }
+      } catch (error) {
+        console.error('Failed to check setup status:', error);
+        // If we can't check setup status, assume no setup needed
+        setSetupRequired(false);
+      }
+    };
+
+    // Only check setup status if we're not authenticated
+    // (authenticated means someone already exists)
+    if (!isAuthenticated && !userLoading) {
+      checkSetupStatus();
+    } else {
+      setSetupRequired(false);
+    }
+  }, [isAuthenticated, userLoading]);
 
   if (isLoading) {
     return (
@@ -67,7 +96,7 @@ export const Layout: FC<LayoutProps> = ({ children }) => {
               <div className="space-y-1">
                 {channels.map((channelWithMembership) => (
                   <ChannelItem
-                    key={`${channelWithMembership.membership.channel_instance_fqdn}-${channelWithMembership.membership.channel_name}`}
+                    key={`${channelWithMembership.channel_instance_fqdn}-${channelWithMembership.channel_name}`}
                     channelWithMembership={channelWithMembership}
                     onLeave={(instanceFqdn, channelName) => leaveChannel({ instanceFqdn, channelName })}
                   />
@@ -123,12 +152,15 @@ export const Layout: FC<LayoutProps> = ({ children }) => {
 };
 
 interface ChannelItemProps {
-  channelWithMembership: ChannelWithMembership;
+  channelWithMembership: ChannelMembershipWithChannel;
   onLeave: (instanceFqdn: string, channelName: string) => void;
 }
 
 const ChannelItem: FC<ChannelItemProps> = ({ channelWithMembership, onLeave }) => {
-  const { membership, channel, is_local } = channelWithMembership;
+  // The ChannelMembershipWithChannel type has the membership data directly
+  const membership = channelWithMembership;
+  const channel = channelWithMembership.channel;
+  const is_local = channelWithMembership.channel_instance_fqdn === window.location.hostname;
   
   const displayName = channel?.name || membership.channel_name;
   

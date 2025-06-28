@@ -9,6 +9,8 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TestAuthRouteImport } from './routes/test-auth'
+import { Route as SetupRouteImport } from './routes/setup'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as ChannelNameRouteImport } from './routes/$channelName'
@@ -17,6 +19,16 @@ import { Route as InstanceFqdnChannelNameRouteImport } from './routes/$instanceF
 import { Route as GroupNameChannelNameRouteImport } from './routes/$groupName/$channelName'
 import { Route as InstanceFqdnGroupNameChannelNameRouteImport } from './routes/$instanceFqdn/$groupName/$channelName'
 
+const TestAuthRoute = TestAuthRouteImport.update({
+  id: '/test-auth',
+  path: '/test-auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SetupRoute = SetupRouteImport.update({
+  id: '/setup',
+  path: '/setup',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -59,6 +71,8 @@ export interface FileRoutesByFullPath {
   '/$channelName': typeof ChannelNameRoute
   '/admin': typeof AdminRoute
   '/settings': typeof SettingsRoute
+  '/setup': typeof SetupRoute
+  '/test-auth': typeof TestAuthRoute
   '/$groupName/$channelName': typeof GroupNameChannelNameRoute
   '/$instanceFqdn/$channelName': typeof InstanceFqdnChannelNameRoute
   '/$instanceFqdn/$groupName/$channelName': typeof InstanceFqdnGroupNameChannelNameRoute
@@ -68,6 +82,8 @@ export interface FileRoutesByTo {
   '/$channelName': typeof ChannelNameRoute
   '/admin': typeof AdminRoute
   '/settings': typeof SettingsRoute
+  '/setup': typeof SetupRoute
+  '/test-auth': typeof TestAuthRoute
   '/$groupName/$channelName': typeof GroupNameChannelNameRoute
   '/$instanceFqdn/$channelName': typeof InstanceFqdnChannelNameRoute
   '/$instanceFqdn/$groupName/$channelName': typeof InstanceFqdnGroupNameChannelNameRoute
@@ -78,6 +94,8 @@ export interface FileRoutesById {
   '/$channelName': typeof ChannelNameRoute
   '/admin': typeof AdminRoute
   '/settings': typeof SettingsRoute
+  '/setup': typeof SetupRoute
+  '/test-auth': typeof TestAuthRoute
   '/$groupName/$channelName': typeof GroupNameChannelNameRoute
   '/$instanceFqdn/$channelName': typeof InstanceFqdnChannelNameRoute
   '/$instanceFqdn/$groupName/$channelName': typeof InstanceFqdnGroupNameChannelNameRoute
@@ -89,6 +107,8 @@ export interface FileRouteTypes {
     | '/$channelName'
     | '/admin'
     | '/settings'
+    | '/setup'
+    | '/test-auth'
     | '/$groupName/$channelName'
     | '/$instanceFqdn/$channelName'
     | '/$instanceFqdn/$groupName/$channelName'
@@ -98,6 +118,8 @@ export interface FileRouteTypes {
     | '/$channelName'
     | '/admin'
     | '/settings'
+    | '/setup'
+    | '/test-auth'
     | '/$groupName/$channelName'
     | '/$instanceFqdn/$channelName'
     | '/$instanceFqdn/$groupName/$channelName'
@@ -107,6 +129,8 @@ export interface FileRouteTypes {
     | '/$channelName'
     | '/admin'
     | '/settings'
+    | '/setup'
+    | '/test-auth'
     | '/$groupName/$channelName'
     | '/$instanceFqdn/$channelName'
     | '/$instanceFqdn/$groupName/$channelName'
@@ -117,6 +141,8 @@ export interface RootRouteChildren {
   ChannelNameRoute: typeof ChannelNameRoute
   AdminRoute: typeof AdminRoute
   SettingsRoute: typeof SettingsRoute
+  SetupRoute: typeof SetupRoute
+  TestAuthRoute: typeof TestAuthRoute
   GroupNameChannelNameRoute: typeof GroupNameChannelNameRoute
   InstanceFqdnChannelNameRoute: typeof InstanceFqdnChannelNameRoute
   InstanceFqdnGroupNameChannelNameRoute: typeof InstanceFqdnGroupNameChannelNameRoute
@@ -124,6 +150,20 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/test-auth': {
+      id: '/test-auth'
+      path: '/test-auth'
+      fullPath: '/test-auth'
+      preLoaderRoute: typeof TestAuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/setup': {
+      id: '/setup'
+      path: '/setup'
+      fullPath: '/setup'
+      preLoaderRoute: typeof SetupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings': {
       id: '/settings'
       path: '/settings'
@@ -181,6 +221,8 @@ const rootRouteChildren: RootRouteChildren = {
   ChannelNameRoute: ChannelNameRoute,
   AdminRoute: AdminRoute,
   SettingsRoute: SettingsRoute,
+  SetupRoute: SetupRoute,
+  TestAuthRoute: TestAuthRoute,
   GroupNameChannelNameRoute: GroupNameChannelNameRoute,
   InstanceFqdnChannelNameRoute: InstanceFqdnChannelNameRoute,
   InstanceFqdnGroupNameChannelNameRoute: InstanceFqdnGroupNameChannelNameRoute,

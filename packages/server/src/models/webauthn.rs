@@ -60,7 +60,7 @@ pub struct RegisterFinishResponse {
 
 #[derive(Debug, Deserialize, Object)]
 pub struct LoginBeginRequest {
-    pub username: Option<String>,
+    // Resident keys only - no username needed
 }
 
 #[derive(Debug, Serialize, Object)]

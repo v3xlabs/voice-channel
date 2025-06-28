@@ -1,0 +1,19 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+In rust use poem_openapi. For typescript `pnpm dev:openapi` (in the `packages/web` directory) uses the `openapi-typescript` library to generate a new typescript file.
+Use tanstack query in combination with `openapi-hooks` (github.com/v3xlabs/openapi-hooks).
+Write hooks as:
+```tsx
+export const getPostById = (post_id: string) => queryOptions({
+  queryKey: ['post', '{post_id}', post_id],
+  queryFn: async () => {
+    const result = await apiFetch('/post/{post_id}', { params: {post_id: post_id}});
+
+    return result.data;
+  }
+});
+export const usePostById = (post_id: string) => useQuery(getPostById(post_id));
+```

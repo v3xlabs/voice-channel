@@ -20,6 +20,7 @@ mod services;
 use config::Config;
 use database::Database;
 use handlers::api::Api;
+use handlers::setup::SetupApi;
 use services::mediasoup_service::MediasoupService;
 use services::participant_service::ParticipantService;
 use services::webauthn::WebAuthnService;
@@ -86,6 +87,18 @@ async fn main() -> Result<()> {
     webauthn.validate_config()?;
     info!("WebAuthn service configuration validated successfully");
 
+    // Ensure instance settings exist
+    match models::instance_settings::InstanceSettings::get_by_fqdn(&db.pool, &config.instance_fqdn).await? {
+        Some(_) => {
+            info!("Instance settings found for {}", config.instance_fqdn);
+        }
+        None => {
+            info!("Creating default instance settings for {}", config.instance_fqdn);
+            models::instance_settings::InstanceSettings::create_default(&db.pool, &config.instance_fqdn).await?;
+            info!("Default instance settings created");
+        }
+    }
+
     // Create shared application state
     let state = Arc::new(AppState { 
         db, 
@@ -96,8 +109,19 @@ async fn main() -> Result<()> {
     });
 
     // Create unified API service that includes both channel and WebRTC endpoints
-    let api_service = OpenApiService::new(Api { state }, "Voice Channel API", "1.0")
+    let api_service = OpenApiService::new(Api { state: state.clone() }, "Voice Channel API", "1.0")
         .server("http://localhost:3001/api");
+    
+    // Create setup API service for bootstrap functionality
+    let setup_api_service = OpenApiService::new(
+        SetupApi {
+            pool: state.db.pool.clone(),
+            webauthn: (*state.webauthn).clone(),
+            instance_fqdn: state.config.instance_fqdn.clone(),
+        },
+        "Voice Channel Setup API",
+        "1.0"
+    ).server("http://localhost:3001/setup");
     
     let spec_endpoint = api_service.spec_endpoint();
     
@@ -114,6 +138,7 @@ async fn main() -> Result<()> {
     
     let app = Route::new()
         .nest("/api", api_service)
+        .nest("/setup", setup_api_service)
         .at("/openapi.json", spec_endpoint)
         .at("/docs", poem::endpoint::make_sync(move |_| {
             Html(docs_html)

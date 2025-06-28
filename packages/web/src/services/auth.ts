@@ -7,11 +7,16 @@ export type User = components['schemas']['User'];
 export type CreateUserRequest = components['schemas']['CreateUserRequest'];
 export type UpdateUserRequest = components['schemas']['UpdateUserRequest'];
 export type UserAuthResponse = components['schemas']['UserAuthResponse'];
-export type ChannelWithMembership = components['schemas']['ChannelWithMembership'];
 export type ChannelMembership = components['schemas']['ChannelMembership'];
-export type JoinChannelMembershipRequest = components['schemas']['JoinChannelMembershipRequest'];
+export type ChannelMembershipWithChannel = components['schemas']['ChannelMembershipWithChannel'];
 export type InstanceSettings = components['schemas']['InstanceSettings'];
 export type Invitation = components['schemas']['Invitation'];
+
+// Custom interface for auth responses
+export interface AuthResponse {
+  user: User;
+  success: boolean;
+}
 
 const STORAGE_KEY = 'voice-channel-user';
 
@@ -57,7 +62,7 @@ export class AuthService {
   }
 
   // Create new account with WebAuthn passkey
-  async createAccount(displayName: string, inviteCode?: string): Promise<UserAuthResponse> {
+  async createAccount(displayName: string, inviteCode?: string): Promise<AuthResponse> {
     try {
       console.log('🆕 Starting WebAuthn registration for:', displayName);
       
@@ -104,10 +109,22 @@ export class AuthService {
       });
 
       console.log('🎉 Registration successful:', finishResponse.data);
-      const authResponse = finishResponse.data as UserAuthResponse;
-      this.saveToStorage(authResponse.user);
+      const regResponse = finishResponse.data;
       
-      return authResponse;
+      if (regResponse.success && regResponse.user_id) {
+        // Fetch full user profile after successful registration
+        const userResponse = await apiFetch('/users/{user_id}', 'get', {
+          path: { user_id: regResponse.user_id },
+        });
+        
+        const user = userResponse.data as User;
+        this.saveToStorage(user);
+        console.log('💾 User profile fetched and saved to storage:', user);
+        
+        return { user, success: true } as AuthResponse;
+      } else {
+        throw new Error('Registration completed but failed to get user data');
+      }
     } catch (error) {
       console.error('❌ WebAuthn registration failed:', error);
       console.error('❌ Registration error details:', JSON.stringify(error, null, 2));
@@ -160,10 +177,22 @@ export class AuthService {
       });
 
       console.log('🎉 Authentication successful:', finishResponse.data);
-      const authResponse = finishResponse.data;
-      this.saveToStorage(authResponse.user);
+      const loginResponse = finishResponse.data;
       
-      return true;
+      if (loginResponse.success && loginResponse.user_id) {
+        // Fetch full user profile after successful login
+        const userResponse = await apiFetch('/users/{user_id}', 'get', {
+          path: { user_id: loginResponse.user_id },
+        });
+        
+        const user = userResponse.data as User;
+        this.saveToStorage(user);
+        console.log('💾 User profile fetched and saved after login:', user);
+        
+        return true;
+      } else {
+        throw new Error('Login completed but failed to get user data');
+      }
     } catch (error) {
       console.error('❌ WebAuthn authentication failed:', error);
       console.error('❌ Error details:', JSON.stringify(error, null, 2));
@@ -188,7 +217,7 @@ export class AuthService {
     }
 
     const response = await apiFetch('/users/{user_id}', 'patch', {
-      path: { user_id: this.currentUser.id },
+      path: { user_id: this.currentUser.user_id },
       contentType: 'application/json; charset=utf-8',
       data: updates,
     });
@@ -200,16 +229,16 @@ export class AuthService {
   }
 
   // Get user's joined channels
-  async getUserChannels(): Promise<ChannelWithMembership[]> {
+  async getUserChannels(): Promise<ChannelMembershipWithChannel[]> {
     if (!this.currentUser) {
       throw new Error('No user logged in');
     }
 
     const response = await apiFetch('/users/{user_id}/channels', 'get', {
-      path: { user_id: this.currentUser.id },
+      path: { user_id: this.currentUser.user_id },
     });
 
-    return response.data as ChannelWithMembership[];
+    return response.data as ChannelMembershipWithChannel[];
   }
 
   // Join a channel (become a member)
@@ -218,19 +247,12 @@ export class AuthService {
       throw new Error('No user logged in');
     }
 
-    const request: JoinChannelMembershipRequest = {
-      user_id: this.currentUser.id,
-      channel_instance_fqdn: instanceFqdn,
-      channel_name: channelName,
-    };
-
     const response = await apiFetch('/channels/{channel_instance_fqdn}/{channel_name}/members', 'post', {
       path: { 
         channel_instance_fqdn: instanceFqdn,
         channel_name: channelName,
       },
-      contentType: 'application/json; charset=utf-8',
-      data: request,
+      query: { user_id: this.currentUser.user_id },
     });
 
     return response.data as ChannelMembership;
@@ -246,7 +268,7 @@ export class AuthService {
       path: { 
         channel_instance_fqdn: instanceFqdn,
         channel_name: channelName,
-        user_id: this.currentUser.id,
+        user_id: this.currentUser.user_id,
       },
     });
   }

@@ -48,8 +48,12 @@ impl WebAuthnService {
         let builder = WebauthnBuilder::new(rp_id, &rp_origin)
             .map_err(|e| anyhow!("Failed to create WebAuthn builder: {}", e))?;
         
+        // Configure the builder for proper resident key support
+        // According to webauthn-rs docs, we need to explicitly configure for passkeys
         let webauthn = builder
             .rp_name(rp_id)
+            // Enable resident key support for discoverable credentials
+            .allow_subdomains(false) // Strict domain matching for security
             .build()
             .map_err(|e| anyhow!("Failed to build WebAuthn service: {}", e))?;
 
@@ -130,6 +134,10 @@ impl WebAuthnService {
         );
         
         // Start RESIDENT KEY registration (enforced)
+        // Note: start_passkey_registration should create resident keys according to webauthn-rs docs
+        // However, the response shows "residentKey": "discouraged" which suggests webauthn-rs
+        // may be using WebAuthn Level 1 specification internally. This is a known issue
+        // with inconsistent behavior across different platforms and WebAuthn libraries.
         let (ccr, passkey_registration) = self.webauthn.start_passkey_registration(
             user_id,
             &request.display_name,

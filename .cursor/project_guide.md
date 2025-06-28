@@ -87,6 +87,27 @@ Instances can be scaled horizontally by running multiple worker processes.
     -   **Invite-Only**: Users must have a unique invite link (`/invite/:code`) to create an account.
     -   **Open**: Anyone can create an account.
 
+### Instance Data Model
+
+Each instance maintains its own persistent data:
+
+- **Users** – WebAuthn credentials (resident keys), profile data, and permissions.
+- **Groups** – Top-level namespaces that organize channels.
+- **Channels** – Contain message history, voice-call metadata, and settings.
+- **Memberships** – Relationships linking users to channels (read status, roles, etc.).
+
+There is **no shared global database**—federation happens through API calls between instances.
+
+### Admin Bootstrapping (Zero-User Setup)
+
+When the database is empty the server automatically exposes a **Setup Wizard** at `/setup`:
+
+1. Create the first account via resident-key registration.
+2. Assign the new user `admin` role.
+3. Allow the admin to review and change default instance settings (registration mode, federation keys, etc.).
+
+After completion, `/setup` is disabled until the database is emptied again.
+
 ## 5. URL Structure
 
 The URL scheme is designed for seamless local and federated channel access.

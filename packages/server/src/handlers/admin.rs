@@ -152,9 +152,8 @@ impl AdminApi {
     async fn deactivate_invitation(
         &self,
         invitation_id: Path<Uuid>,
-        _user_id: Query<Uuid>,
     ) -> Result<Json<bool>, poem::Error> {
-        // In a real implementation, you'd verify the user owns this invitation or is admin
+        // TODO: Get user_id from authentication middleware and verify the user owns this invitation or is admin
         let success = Invitation::deactivate(&self.state.db.pool, invitation_id.0)
             .await
             .map_err(|e| poem::Error::from_string(e.to_string(), poem::http::StatusCode::INTERNAL_SERVER_ERROR))?;

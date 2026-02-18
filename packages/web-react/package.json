@@ -1,0 +1,50 @@
+{
+  "name": "voice-channel-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:openapi": "openapi-typescript http://localhost:3001/openapi.json --output ./src/schema.gen.ts",
+    "build": "tsc && vite build",
+    "lint": "eslint . --report-unused-disable-directives --max-warnings 0",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@radix-ui/react-dialog": "^1.0.5",
+    "@radix-ui/react-label": "^2.1.7",
+    "@radix-ui/react-slot": "^1.0.2",
+    "@tanstack/react-query": "^5.56.2",
+    "@tanstack/react-router": "^1.122.0",
+    "classnames": "^2.3.2",
+    "lucide-react": "^0.294.0",
+    "mediasoup-client": "^3.7.4",
+    "openapi-hooks": "^0.0.6",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  },
+  "devDependencies": {
+    "@tanstack/router-cli": "^1.122.0",
+    "@tanstack/router-devtools": "^1.122.0",
+    "@tanstack/router-plugin": "^1.122.0",
+    "@tanstack/router-vite-plugin": "^1.122.0",
+    "@types/react": "^18.2.37",
+    "@types/react-dom": "^18.2.15",
+    "@typescript-eslint/eslint-plugin": "^6.10.0",
+    "@typescript-eslint/parser": "^6.10.0",
+    "@vitejs/plugin-react": "^4.1.1",
+    "autoprefixer": "^10.4.16",
+    "concurrently": "^8.2.2",
+    "eslint": "^8.53.0",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.4.4",
+    "globals": "^16.2.0",
+    "openapi-typescript": "^7.4.0",
+    "postcss": "^8.4.31",
+    "tailwindcss": "^3.3.5",
+    "typescript": "^5.2.2",
+    "vite": "^5.4.19"
+  }
+}

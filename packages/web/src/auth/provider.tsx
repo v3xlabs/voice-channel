@@ -1,4 +1,6 @@
-import { Accessor, children, createContext, createEffect, createMemo, createResource, createSignal, Resource, useContext, type ParentComponent } from "solid-js";
+import { Accessor, children, Component, createContext, createEffect, createMemo, createResource, createSignal, Resource, useContext, type ParentComponent } from "solid-js";
+import type { paths, components } from '../schema.gen';
+import { createFetch } from "openapi-hooks";
 
 const TOKEN_KEY = 'voice-channel-token';
 
@@ -8,9 +10,9 @@ export type User = {
     email: string;
 };
 
-export const fetchUser = (token: string | null) => async (): Promise<User | null> => {
+export const fetchUser = (token: string | null) => async (): Promise<User | undefined> => {
     // TODO: implement
-    if (!token) return null;
+    if (!token) return undefined;
 
     await new Promise(resolve => setTimeout(resolve, 1000));
 
@@ -26,14 +28,20 @@ export type AuthContextType = {
     isAuthed: Accessor<boolean>;
     login: (token: string) => void;
     logout: () => void;
-    user: Resource<User | null>;
+    user: Resource<User | undefined>;
+    fetchApi: Accessor<typeof baseFetch>;
 };
 
 const AuthContext = createContext<AuthContextType>();
 
+// @ts-expect-error - weird type error, but works fine
+const baseFetch = createFetch<paths>({
+    baseUrl: 'http://localhost:3001/api/',
+});
+
 export const AuthProvider: ParentComponent = (props) => {
     const [token, setToken] = createSignal<string | null>(
-        localStorage.getItem(TOKEN_KEY)
+        localStorage.getItem(TOKEN_KEY) || null
     );
 
     createEffect(() => {
@@ -46,12 +54,28 @@ export const AuthProvider: ParentComponent = (props) => {
 
     const [user] = createResource(fetchUser(token()));
 
+    const fetchApi = createMemo(() => {
+        const fetcher: typeof baseFetch = (path, method, options) => {
+            const fetchOptions = options.fetchOptions ?? {};
+            if (token()) {
+                fetchOptions.headers = {
+                    ...fetchOptions.headers,
+                    'Authorization': `Bearer ${token()}`,
+                };
+            }
+            return baseFetch(path, method, { ...options, fetchOptions });
+        };
+
+        return fetcher;
+    });
+
     const value: AuthContextType = {
         token,
         isAuthed,
         login: setToken,
         logout: () => setToken(null),
         user,
+        fetchApi,
     };
 
     return (

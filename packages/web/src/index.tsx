@@ -5,6 +5,7 @@ import 'solid-devtools';
 
 import { App } from './App';
 import { AuthProvider } from './auth/provider';
+import { Router } from '@solidjs/router';
 
 const root = document.getElementById('root');
 
@@ -14,4 +15,4 @@ if (import.meta.env.DEV && !(root instanceof HTMLElement)) {
   );
 }
 
-render(() => <AuthProvider children={<App />} />, root!);
+render(() => <AuthProvider children={<Router><App /></Router>} />, root!);

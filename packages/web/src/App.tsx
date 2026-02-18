@@ -1,7 +1,24 @@
-import { Show, type Component } from 'solid-js';
+import { createEffect, ParentComponent, Show, type Component } from 'solid-js';
 import { useAuth } from './auth/provider';
 import { Login } from './auth/login';
-import { Sidebar } from './sidebar';
+import { Sidebar, Sidebarred } from './sidebar';
+import { Route, Router, RouteSectionProps } from '@solidjs/router';
+import { ServerOverviewRoute } from './routes/server';
+
+const Home = () => {
+  return (
+    <div class="p-4">Home</div>
+  )
+};
+
+
+const Shell: ParentComponent = (props) => {
+  return (
+    <Sidebarred>
+      {props.children}
+    </Sidebarred>
+  )
+}
 
 export const App: Component = () => {
   const { isAuthed, logout } = useAuth();
@@ -9,16 +26,13 @@ export const App: Component = () => {
   return (
     <>
       <Show when={!isAuthed()}>
-        <Login />
+        <Route path="*" component={Login} />
       </Show>
       <Show when={isAuthed()}>
-        <div class="flex">
-          <Sidebar />
-          <div class="p-4">
-            <div>Authenticated</div>
-            <button onClick={logout} class="button">Logout</button>
-          </div>
-        </div>
+        <Route path="/" component={Shell}>
+          <Route path="/" component={Home} />
+          <Route path="/server/:groupId" component={ServerOverviewRoute} />
+        </Route>
       </Show>
     </>
   )

@@ -7,11 +7,13 @@
     "start": "vite",
     "dev": "vite",
     "build": "vite build",
+    "gen:openapi": "openapi-typescript http://localhost:3001/openapi.json --output ./src/schema.gen.ts",
     "serve": "vite preview"
   },
   "license": "MIT",
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.13",
+    "openapi-typescript": "^7.4.0",
     "solid-devtools": "^0.34.3",
     "tailwindcss": "^4.1.13",
     "typescript": "^5.9.2",
@@ -19,6 +21,12 @@
     "vite-plugin-solid": "^2.11.8"
   },
   "dependencies": {
+    "@kobalte/core": "^0.13.11",
+    "@solidjs/router": "^0.15.4",
+    "@zag-js/menu": "^1.33.1",
+    "@zag-js/solid": "^1.33.1",
+    "openapi-hooks": "^0.0.6",
+    "solid-icons": "^1.2.0",
     "solid-js": "^1.9.9"
   }
 }

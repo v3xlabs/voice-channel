@@ -1,6 +1,7 @@
-import { For } from "solid-js";
+import { For, ParentComponent, Show } from "solid-js";
 import { ServerGroup } from "./server";
-import { useAuth } from "../auth/provider";
+import { SidebarSettings } from "./settings";
+import { useParams } from "@solidjs/router";
 
 export type Server = {
     name: string;
@@ -31,7 +32,7 @@ export const Sidebar = () => {
                     icon: '🎮',
                 },
                 {
-                    groupId: '2',
+                    groupId: '3',
                     name: 'V3X Testing',
                     icon: '🧪',
                 }
@@ -42,12 +43,12 @@ export const Sidebar = () => {
             url: 'https://voice.channel',
             groups: [
                 {
-                    groupId: '3',
+                    groupId: '4',
                     name: 'Jakob\'s Home',
                     icon: '🇸🇪',
                 },
                 {
-                    groupId: '4',
+                    groupId: '5',
                     name: 'Steve\'s Home',
                     icon: '🏠',
                 }
@@ -58,18 +59,18 @@ export const Sidebar = () => {
             url: 'https://voice.channel',
             groups: [
                 {
-                    groupId: '5',
+                    groupId: '6',
                     name: 'General Lounge Server With Long Name That Doesn\'t End',
                     icon: '🏠',
                 }
             ]
         }
     ];
-    const { logout } = useAuth();
 
     return (
         <div class="h-screen flex relative">
             <div class="w-[72px] bg-neutral-900 h-full flex flex-col gap-2 items-center p-2">
+                <a href="/">Home</a>
                 <For each={servers}>
                     {(server) => (
                         <ServerGroup server={server} />
@@ -77,12 +78,34 @@ export const Sidebar = () => {
                 </For>
             </div>
             <div class="w-64 bg-neutral-800 h-full flex">
+                <ServerChannels />
+            </div>
+            <div class="absolute bottom-2 left-2 right-2 p-2 rounded-lg bg-neutral-700">
+                <div class="w-full flex justify-end">
+                    <SidebarSettings />
+                </div>
+            </div>
+        </div>
+    )
+};
 
+const ServerChannels = () => {
+    const params = useParams<{ groupId: string }>();
+
+    return (
+        <Show when={params.groupId}>
+            <div class="p-4">
+                <h1>Server Channels {params.groupId}</h1>
             </div>
-            <div class="absolute bottom-2 left-2 right-2 p-2 rounded-lg bg-neutral-600">
-                <div></div>
-                <button onClick={logout} class="button">Logout</button>
-            </div>
+        </Show>
+    )
+};
+
+export const Sidebarred: ParentComponent = (props) => {
+    return (
+        <div class="flex">
+            <Sidebar />
+            {props.children}
         </div>
     )
 };

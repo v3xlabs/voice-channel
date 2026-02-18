@@ -4,6 +4,7 @@ import { Login } from './auth/login';
 import { Sidebar, Sidebarred } from './sidebar';
 import { Route, Router, RouteSectionProps } from '@solidjs/router';
 import { ServerOverviewRoute } from './routes/server';
+import { ServerChannelRoute } from './routes/server/channel';
 
 const Home = () => {
   return (
@@ -32,6 +33,7 @@ export const App: Component = () => {
         <Route path="/" component={Shell}>
           <Route path="/" component={Home} />
           <Route path="/server/:groupId" component={ServerOverviewRoute} />
+          <Route path="/server/:groupId/:channelId" component={ServerChannelRoute} />
         </Route>
       </Show>
     </>

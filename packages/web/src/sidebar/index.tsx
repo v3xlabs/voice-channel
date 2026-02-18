@@ -1,7 +1,9 @@
-import { For, ParentComponent, Show } from "solid-js";
+import { createResource, For, ParentComponent, Show, Suspense } from "solid-js";
 import { ServerGroup } from "./server";
 import { SidebarSettings } from "./settings";
 import { useParams } from "@solidjs/router";
+import { useAuth } from "../auth/provider";
+import { SidebarActivity } from "./activity";
 
 export type Server = {
     name: string;
@@ -80,9 +82,12 @@ export const Sidebar = () => {
             <div class="w-64 bg-neutral-800 h-full flex">
                 <ServerChannels />
             </div>
-            <div class="absolute bottom-2 left-2 right-2 p-2 rounded-lg bg-neutral-700">
-                <div class="w-full flex justify-end">
-                    <SidebarSettings />
+            <div class="absolute bottom-2 left-2 right-2">
+                <div class="relative z-0">
+                    <SidebarActivity />
+                    <div class="p-2 rounded-lg bg-neutral-700 w-full z-50 flex justify-end relative">
+                        <SidebarSettings />
+                    </div>
                 </div>
             </div>
         </div>
@@ -91,11 +96,37 @@ export const Sidebar = () => {
 
 const ServerChannels = () => {
     const params = useParams<{ groupId: string }>();
+    const { fetchApi } = useAuth();
+    const [channels] = createResource(async () => {
+        return (await fetchApi()('/channels', 'get', {})).data;
+    });
 
     return (
         <Show when={params.groupId}>
             <div class="p-4">
                 <h1>Server Channels {params.groupId}</h1>
+                <Suspense fallback={<div>Loading...</div>}>
+                    <Show when={channels()} keyed>
+                        <ul>
+                            <For each={channels()}>
+                                {(channel) => (
+                                    <li
+                                        classList={{
+                                            'hover:bg-neutral-700': true,
+                                        }}
+                                    >
+                                        <a
+                                            href={`/server/${channel.group_id}/${channel.channel_id}`}
+                                            class="w-full h-full block"
+                                        >
+                                            {channel.name}
+                                        </a>
+                                    </li>
+                                )}
+                            </For>
+                        </ul>
+                    </Show>
+                </Suspense>
             </div>
         </Show>
     )

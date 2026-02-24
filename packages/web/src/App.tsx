@@ -23,14 +23,15 @@ const Shell: ParentComponent = (props) => {
 }
 
 export const App: Component = () => {
-  const { isAuthed } = useAuth();
+  const { isAuthed, isConnecting, isBootstrapping } = useAuth();
+  const showLogin = () => !isAuthed() && !isConnecting() && !isBootstrapping();
 
   return (
     <>
-      <Show when={!isAuthed()}>
+      <Show when={showLogin()}>
         <Route path="*" component={Login} />
       </Show>
-      <Show when={isAuthed()}>
+      <Show when={!showLogin()}>
         <Route path="/" component={Shell}>
           <Route path="/" component={Home} />
           <Route path="/messages" component={MessagesRoute} />

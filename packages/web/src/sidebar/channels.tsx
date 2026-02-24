@@ -4,6 +4,8 @@ import { Show, For } from "solid-js";
 import { ContextMenu } from "@kobalte/core/context-menu";
 import { IdIcon } from "../../public/icon";
 import { useAuth } from "../auth/provider";
+import { Jid } from "../components/jid";
+import { Avatar } from "../components/avatar";
 
 type Channel = {
     channel_id: string;
@@ -84,7 +86,7 @@ export const ServerChannels = () => {
     const [search] = useSearchParams<{ chat?: string }>();
     const { privateChats } = useAuth();
     const isMessagesRoute = () => location.pathname.startsWith('/messages');
-    const activeChat = () => search.chat || '';
+    const activeChat = () => search.chat || privateChats()[0]?.jid || '';
     const channels = () => CHANNELS.filter((channel) => channel.group_id === params.groupId);
 
     return (
@@ -117,15 +119,20 @@ export const ServerChannels = () => {
                                             class="block rounded-md border border-neutral-800 px-3 py-2 hover:bg-neutral-700"
                                             classList={{ "bg-neutral-700 border-cyan-600": activeChat() === chat.jid }}
                                         >
-                                            <div class="flex items-center justify-between gap-2">
-                                                <p class="truncate text-sm text-white">{chat.jid}</p>
-                                                <Show when={chat.unreadCount > 0}>
-                                                    <span class="min-w-5 h-5 rounded-full bg-cyan-700 text-white text-xs inline-flex items-center justify-center px-1">
-                                                        {chat.unreadCount}
-                                                    </span>
-                                                </Show>
+                                            <div class="flex items-center gap-2">
+                                                <Avatar jid={chat.jid} name={chat.name} src={chat.avatarUrl} size={26} />
+                                                <div class="min-w-0 flex-1">
+                                                    <div class="flex items-center justify-between gap-2">
+                                                        <Jid jid={chat.jid} class="truncate text-sm" localClass="text-white" domainClass="opacity-90" />
+                                                        <Show when={chat.unreadCount > 0}>
+                                                            <span class="min-w-5 h-5 rounded-full bg-cyan-700 text-white text-xs inline-flex items-center justify-center px-1">
+                                                                {chat.unreadCount}
+                                                            </span>
+                                                        </Show>
+                                                    </div>
+                                                    <p class="truncate text-xs text-neutral-400">{chat.lastMessage?.body || chat.statusText || 'No messages yet'}</p>
+                                                </div>
                                             </div>
-                                            <p class="truncate text-xs text-neutral-400">{chat.lastMessage?.body || 'No messages yet'}</p>
                                         </a>
                                     </li>
                                 )}

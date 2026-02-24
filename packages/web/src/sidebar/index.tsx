@@ -5,6 +5,8 @@ import { useAuth } from "../auth/provider";
 import { SidebarActivity } from "./activity";
 import { ServerChannels } from "./channels";
 import { BsChatDots } from "solid-icons/bs";
+import { Jid } from "../components/jid";
+import { Avatar } from "../components/avatar";
 
 export type Server = {
     name: string;
@@ -19,10 +21,17 @@ export type Group = {
 }
 
 export const Sidebar = () => {
-    const { privateChats } = useAuth();
+    const { privateChats, profile, presence, setPresence } = useAuth();
     const unreadTotal = createMemo(() => {
         return privateChats().reduce((total, chat) => total + chat.unreadCount, 0);
     });
+    const presenceOrder = ['online', 'chat', 'away', 'xa', 'dnd'] as const;
+    const nextPresence = () => {
+        const current = presence().show;
+        const index = presenceOrder.indexOf(current);
+        const next = presenceOrder[(index + 1) % presenceOrder.length];
+        setPresence({ show: next, status: presence().status });
+    };
 
     const servers: Server[] = [
         {
@@ -104,7 +113,31 @@ export const Sidebar = () => {
             <div class="absolute bottom-2 left-2 right-2">
                 <div class="relative z-0">
                     <SidebarActivity />
-                    <div class="p-2 rounded-lg bg-neutral-700 w-full z-50 flex justify-end relative">
+                    <div class="p-2 rounded-lg bg-neutral-700 w-full z-50 flex items-center justify-between gap-2 relative">
+                        <div class="min-w-0 px-2">
+                            <p class="text-[11px] text-neutral-400">Signed in as</p>
+                            <Show when={profile()} fallback={<span class="text-sm text-neutral-300">Guest</span>}>
+                                <div class="flex items-center gap-2 min-w-0">
+                                    <button
+                                        class="shrink-0"
+                                        onClick={nextPresence}
+                                        title="Cycle presence"
+                                    >
+                                        <Avatar
+                                            jid={profile()?.jid}
+                                            name={profile()?.name}
+                                            src={profile()?.avatarUrl}
+                                            presence={profile()?.presence}
+                                            size={24}
+                                        />
+                                    </button>
+                                    <div class="min-w-0">
+                                        <Jid jid={profile()?.jid || ''} class="text-sm truncate block" localClass="text-white" domainClass="font-medium" />
+                                        <p class="text-[11px] text-neutral-400 truncate">{profile()?.statusText || profile()?.presence}</p>
+                                    </div>
+                                </div>
+                            </Show>
+                        </div>
                         <SidebarSettings />
                     </div>
                 </div>

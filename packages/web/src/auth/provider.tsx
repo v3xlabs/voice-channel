@@ -3,30 +3,15 @@ import { createStore, reconcile } from "solid-js/store";
 import { Agent, createClient } from 'stanza';
 import type { Credentials } from 'stanza/lib/sasl';
 
-export type User = {
-    id: string;
-    name: string;
-    email: string;
-};
-
-export const fetchUser = (token: string | null) => async (): Promise<User | undefined> => {
-    // TODO: implement
-    if (!token) return undefined;
-
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    return {
-        id: '123',
-        name: 'John Doe',
-        email: 'john.doe@example.com',
-    };
-};
-
 export type AuthContextType = {
     isAuthed: Accessor<boolean>;
     isConnecting: Accessor<boolean>;
+    isBootstrapping: Accessor<boolean>;
     jid: Accessor<string | undefined>;
     resource: Accessor<string>;
+    profile: Accessor<ContactProfile | undefined>;
+    contacts: Accessor<ContactProfile[]>;
+    presence: Accessor<PresenceState>;
     login: (jid: string, password: string) => void;
     logout: () => void;
     setResource: (resource: string) => void;
@@ -37,6 +22,7 @@ export type AuthContextType = {
     hasOlderMessages: (conversationJid: string) => boolean;
     markConversationRead: (conversationJid: string) => void;
     sendChat: (to: string, body: string) => string | undefined;
+    setPresence: (presence: PresenceState) => void;
     omemo: {
         canUse: Accessor<boolean>;
         setEnabled: (enabled: boolean) => void;
@@ -54,6 +40,7 @@ const VC_SETTINGS_KEY = '@vc/xmpp-settings';
 const VC_READ_STATE_PREFIX = '@vc/xmpp-read-state';
 const VC_MESSAGES_PREFIX = '@vc/xmpp-messages';
 const DEFAULT_RESOURCE = 'voice-channel-web';
+const DEFAULT_PRESENCE: PresenceState = { show: 'online', status: '' };
 
 type PersistedCred = {
     jid: string;
@@ -62,6 +49,7 @@ type PersistedCred = {
 
 type XmppSettings = {
     resource: string;
+    presence: PresenceState;
 };
 
 export type XmppMessage = {
@@ -78,10 +66,37 @@ export type XmppMessage = {
 
 export type PrivateChatSummary = {
     jid: string;
+    name?: string;
+    avatarUrl?: string;
+    presence: PresenceKind;
+    statusText?: string;
     lastMessage?: XmppMessage;
     unreadCount: number;
     lastReadAt?: number;
     hasOlder: boolean;
+};
+
+type PresenceKind = 'offline' | 'online' | 'chat' | 'away' | 'xa' | 'dnd';
+
+type PresenceState = {
+    show: Exclude<PresenceKind, 'offline' | 'online'> | 'online';
+    status: string;
+};
+
+type ContactProfile = {
+    jid: string;
+    name?: string;
+    avatarUrl?: string;
+    avatarHash?: string;
+    subscription?: string;
+    presence: PresenceKind;
+    statusText?: string;
+};
+
+type PresenceResourceState = {
+    presence: PresenceKind;
+    statusText?: string;
+    updatedAt: number;
 };
 
 type ConversationMeta = {
@@ -89,6 +104,14 @@ type ConversationMeta = {
     lastReadAt?: number;
     mamBefore?: string;
     hasOlder: boolean;
+};
+
+type HistorySearchResult = {
+    complete?: boolean;
+    paging?: {
+        first?: string;
+    };
+    results?: unknown[];
 };
 
 const NS_OMEMO_DEVICELIST = 'eu.siacs.conversations.axolotl.devicelist';
@@ -153,6 +176,13 @@ const toBareJid = (value?: string) => {
     return value.slice(0, slashIndex);
 };
 
+const toResource = (value?: string) => {
+    if (!value) return '';
+    const slashIndex = value.indexOf('/');
+    if (slashIndex < 0) return '';
+    return value.slice(slashIndex + 1);
+};
+
 const getMessageBody = (msg: any) => {
     if (typeof msg?.body === 'string' && msg.body.trim().length > 0) return msg.body;
     const firstAlternate = msg?.alternateLanguageBodies?.[0];
@@ -160,13 +190,34 @@ const getMessageBody = (msg: any) => {
     return '';
 };
 
+const normalizePresence = (show?: string, type?: string): PresenceKind => {
+    if (type === 'unavailable') return 'offline';
+    if (show === 'chat' || show === 'away' || show === 'xa' || show === 'dnd') return show;
+    return 'online';
+};
+
+const toDataUrl = (bytes: unknown, mediaType = 'image/jpeg') => {
+    if (!(bytes instanceof Uint8Array)) return undefined;
+    let binary = '';
+    for (const byte of bytes) binary += String.fromCharCode(byte);
+    return `data:${mediaType};base64,${btoa(binary)}`;
+};
+
 export const AuthProvider: ParentComponent = (props) => {
+    const initialSettings = parseJSON<Partial<XmppSettings>>(localStorage.getItem(VC_SETTINGS_KEY), {});
+    const initialStatus = initialSettings.presence?.status === 'Voice Channel online'
+        ? ''
+        : (initialSettings.presence?.status || DEFAULT_PRESENCE.status);
     const [creds, setCredentials] = createSignal<PersistedCred | undefined>(
         sanitizePersistedCred(parseJSON<PersistedCred | undefined>(localStorage.getItem(VC_CRED_KEY), undefined))
     );
-    const [settings, setSettings] = createSignal<XmppSettings>(
-        parseJSON<XmppSettings>(localStorage.getItem(VC_SETTINGS_KEY), { resource: DEFAULT_RESOURCE })
-    );
+    const [settings, setSettings] = createSignal<XmppSettings>({
+        resource: initialSettings.resource || DEFAULT_RESOURCE,
+        presence: {
+            show: initialSettings.presence?.show || DEFAULT_PRESENCE.show,
+            status: initialStatus,
+        },
+    });
     const [persistedReadState, setPersistedReadState] = createSignal<Record<string, number>>(
         parseJSON<Record<string, number>>(localStorage.getItem(readStateKeyFor(creds()?.jid)), {})
     );
@@ -188,9 +239,11 @@ export const AuthProvider: ParentComponent = (props) => {
 
     const [isAuthed, setIsAuthed] = createSignal(false);
     const [isConnecting, setIsConnecting] = createSignal(false);
+    const [isBootstrapping, setIsBootstrapping] = createSignal(Boolean(creds()));
     const [hasSession, setHasSession] = createSignal(false);
     const [client, setClient] = createSignal<Agent | undefined>(undefined);
-    const [rosterJids, setRosterJids] = createSignal<string[]>([]);
+    const [contactsByJid, setContactsByJid] = createStore<Record<string, ContactProfile>>({});
+    const [presenceByContact, setPresenceByContact] = createStore<Record<string, Record<string, PresenceResourceState>>>({});
     const [messagesByConversation, setMessagesByConversation] = createStore<Record<string, XmppMessage[]>>({});
     const [conversationMeta, setConversationMeta] = createStore<Record<string, ConversationMeta>>({});
     const [omemoAvailable, setOmemoAvailable] = createSignal(false);
@@ -220,6 +273,44 @@ export const AuthProvider: ParentComponent = (props) => {
         }
     };
 
+    const ensureContact = (jid: string) => {
+        if (!jid) return;
+        if (!contactsByJid[jid]) {
+            setContactsByJid(jid, {
+                jid,
+                presence: 'offline',
+            });
+        }
+    };
+
+    const patchContact = (jid: string, patch: Partial<ContactProfile>) => {
+        ensureContact(jid);
+        setContactsByJid(jid, (previous) => ({
+            ...previous,
+            ...patch,
+        }));
+    };
+
+    const aggregatePresence = (states: Record<string, PresenceResourceState> | undefined): { presence: PresenceKind; statusText?: string } => {
+        if (!states) return { presence: 'offline', statusText: '' };
+        const entries = Object.values(states);
+        if (entries.length === 0) return { presence: 'offline', statusText: '' };
+
+        const hasOnline = entries.some((item) => item.presence === 'online' || item.presence === 'chat');
+        const hasAway = entries.some((item) => item.presence === 'away');
+        const hasXa = entries.some((item) => item.presence === 'xa');
+        const hasDnd = entries.some((item) => item.presence === 'dnd');
+
+        const sortedByRecency = [...entries].sort((a, b) => b.updatedAt - a.updatedAt);
+        const statusText = sortedByRecency.find((item) => item.statusText)?.statusText || '';
+
+        if (hasOnline) return { presence: 'online', statusText };
+        if (hasDnd) return { presence: 'dnd', statusText };
+        if (hasAway) return { presence: 'away', statusText };
+        if (hasXa) return { presence: 'xa', statusText };
+        return { presence: 'offline', statusText };
+    };
+
     const hydrateMessagesFromStorage = (accountJid?: string) => {
         const stored = parseJSON<Record<string, XmppMessage[]>>(
             localStorage.getItem(messagesKeyFor(accountJid)),
@@ -239,7 +330,9 @@ export const AuthProvider: ParentComponent = (props) => {
 
         setMessagesByConversation(reconcile(sanitized));
         rebuildSeenMessageIds(sanitized);
-        setRosterJids((prev) => Array.from(new Set([...prev, ...Object.keys(sanitized)])));
+        for (const jid of Object.keys(sanitized)) {
+            ensureContact(jid);
+        }
     };
 
     const persistMessagesToStorage = (accountJid?: string) => {
@@ -274,6 +367,7 @@ export const AuthProvider: ParentComponent = (props) => {
         const to = toBareJid(incoming.to) || (source === 'incoming' ? self : '');
         const conversationJid = source === 'outgoing' ? to : (from === self ? to : from);
         if (!conversationJid) return;
+        ensureContact(conversationJid);
 
         const timestamp = incoming?.delay?.stamp
             ? new Date(incoming.delay.stamp).getTime()
@@ -306,7 +400,6 @@ export const AuthProvider: ParentComponent = (props) => {
         };
 
         let inserted = false;
-        let merged = false;
         setMessagesByConversation(conversationJid, (current = []) => {
             const mergeCandidateIndex = current.findIndex((existing) => {
                 if (incomingIds.includes(existing.id)) return true;
@@ -320,7 +413,6 @@ export const AuthProvider: ParentComponent = (props) => {
             });
 
             if (mergeCandidateIndex >= 0) {
-                merged = true;
                 const existing = current[mergeCandidateIndex];
                 const updated: XmppMessage = {
                     ...existing,
@@ -351,10 +443,6 @@ export const AuthProvider: ParentComponent = (props) => {
             if (normalized.timestamp > lastReadAt) {
                 setConversationMeta(conversationJid, 'unreadCount', (count = 0) => count + 1);
             }
-        }
-
-        if (merged && archived && source === 'incoming') {
-            setMessagesByConversation(conversationJid, (current = []) => [...current].sort((a, b) => a.timestamp - b.timestamp));
         }
     };
 
@@ -443,6 +531,26 @@ export const AuthProvider: ParentComponent = (props) => {
         setOmemoDeviceIds(Array.from(new Set(deviceIds)).sort((a, b) => a - b));
     };
 
+    const loadOwnProfile = async (xmpp: Agent, accountJid: string) => {
+        const bare = toBareJid(accountJid);
+        if (!bare) return;
+
+        try {
+            const vcard = await xmpp.getVCard(bare);
+            const photo = (vcard?.records || []).find((record: any) => record?.type === 'photo');
+            const avatarUrl = photo?.data instanceof Uint8Array
+                ? toDataUrl(photo.data, photo.mediaType || 'image/jpeg')
+                : undefined;
+            patchContact(bare, {
+                jid: bare,
+                name: vcard?.fullName,
+                avatarUrl,
+            });
+        } catch {
+            // ignore vcard fetch errors
+        }
+    };
+
     const setupClient = (reason: 'login' | 'restore' | 'resource-change') => {
         const { jid, credentials } = creds() ?? {};
         if (!jid || !credentials) return undefined;
@@ -459,6 +567,7 @@ export const AuthProvider: ParentComponent = (props) => {
         client()?.disconnect();
         setClient(c);
         setIsConnecting(true);
+        setIsBootstrapping(true);
         setHasSession(false);
 
         c.on('connected', () => {
@@ -468,11 +577,13 @@ export const AuthProvider: ParentComponent = (props) => {
         c.on('auth:success', () => {
             setIsAuthed(true);
             setIsConnecting(false);
+            setIsBootstrapping(false);
         });
 
         c.on('auth:failed', () => {
             setIsAuthed(false);
             setIsConnecting(false);
+            setIsBootstrapping(false);
         });
 
         c.on('session:started', async () => {
@@ -486,17 +597,42 @@ export const AuthProvider: ParentComponent = (props) => {
 
             try {
                 const roster = await c.getRoster();
-                const ids = (roster?.items || []).map((item: any) => toBareJid(item.jid)).filter(Boolean);
-                setRosterJids(ids);
+                for (const item of roster?.items || []) {
+                    const contactJid = toBareJid((item as any).jid);
+                    if (!contactJid) continue;
+                    patchContact(contactJid, {
+                        jid: contactJid,
+                        name: (item as any).name,
+                        subscription: (item as any).subscription,
+                    });
+
+                    if ((item as any).subscription && (item as any).subscription !== 'none') {
+                        c.sendPresence({
+                            to: contactJid,
+                            type: 'probe',
+                        });
+                    }
+                }
             } catch (e) {
                 console.error('Failed to load roster', e);
             }
 
             c.updateCaps();
-            c.sendPresence({ show: 'chat', status: 'Voice Channel online' });
+            const configuredPresence = settings().presence;
+            c.sendPresence({
+                show: configuredPresence.show === 'online' ? undefined : configuredPresence.show,
+                status: configuredPresence.status || undefined,
+            });
             await detectOmemoSupport(c, jid);
             await refreshOmemoDeviceList();
             await loadRecentConversations(c);
+            await loadOwnProfile(c, jid);
+
+            patchContact(toBareJid(jid), {
+                jid: toBareJid(jid),
+                presence: normalizePresence(configuredPresence.show),
+                statusText: configuredPresence.status,
+            });
         });
 
         c.on('session:end', () => {
@@ -520,8 +656,68 @@ export const AuthProvider: ParentComponent = (props) => {
 
         c.on('roster:update', (iq: any) => {
             const items = iq?.roster?.items || [];
-            const ids = items.map((item: any) => toBareJid(item.jid)).filter(Boolean);
-            if (ids.length > 0) setRosterJids((prev) => Array.from(new Set([...prev, ...ids])));
+            for (const item of items) {
+                const contactJid = toBareJid((item as any).jid);
+                if (!contactJid) continue;
+                patchContact(contactJid, {
+                    jid: contactJid,
+                    name: (item as any).name,
+                    subscription: (item as any).subscription,
+                });
+            }
+        });
+
+        c.on('presence', (presence: any) => {
+            const fromFull = presence?.from as string | undefined;
+            const fromBare = toBareJid(fromFull);
+            if (!fromBare) return;
+
+            const resource = toResource(fromFull);
+
+            if (!resource) {
+                patchContact(fromBare, {
+                    presence: normalizePresence(presence?.show, presence?.type),
+                    statusText: presence?.status || '',
+                });
+                return;
+            }
+
+            if (presence?.type === 'unavailable') {
+                const currentResources = { ...(presenceByContact[fromBare] || {}) };
+                delete currentResources[resource];
+                setPresenceByContact(fromBare, currentResources);
+            } else {
+                setPresenceByContact(fromBare, resource, {
+                    presence: normalizePresence(presence?.show, presence?.type),
+                    statusText: presence?.status || '',
+                    updatedAt: Date.now(),
+                });
+            }
+
+            const aggregate = aggregatePresence(presenceByContact[fromBare]);
+            patchContact(fromBare, {
+                presence: aggregate.presence,
+                statusText: aggregate.statusText,
+            });
+        });
+
+        c.on('avatar', async (event: any) => {
+            const avatarJid = toBareJid(event?.jid);
+            const avatarId = event?.avatars?.[0]?.id;
+            if (!avatarJid || !avatarId) return;
+
+            patchContact(avatarJid, { avatarHash: avatarId });
+
+            try {
+                const avatar = await c.getAvatar(avatarJid, avatarId);
+                const content = (avatar as any)?.item?.content;
+                const url = toDataUrl(content?.data, content?.mediaType || 'image/jpeg');
+                if (url) {
+                    patchContact(avatarJid, { avatarUrl: url });
+                }
+            } catch {
+                // ignore avatar fetch errors
+            }
         });
 
         c.on('chat', (msg: any) => {
@@ -551,8 +747,6 @@ export const AuthProvider: ParentComponent = (props) => {
         return reason;
     };
 
-    if (creds()) setupClient('restore');
-
     const login = (jid: string, password: string) => {
         const trimmedJid = jid.trim();
         if (!trimmedJid || !password) return;
@@ -562,7 +756,6 @@ export const AuthProvider: ParentComponent = (props) => {
                 password,
             }),
         });
-        setupClient('login');
     };
 
     const clearMessages = () => {
@@ -583,11 +776,13 @@ export const AuthProvider: ParentComponent = (props) => {
         client()?.disconnect();
         setClient(undefined);
         setCredentials(undefined);
-        setRosterJids([]);
+        setContactsByJid(reconcile({}));
+        setPresenceByContact(reconcile({}));
         clearMessages();
         setHasSession(false);
         setIsAuthed(false);
         setIsConnecting(false);
+        setIsBootstrapping(false);
         setOmemoDeviceIds([]);
         setPersistedReadState({});
         localStorage.removeItem(messagesKeyFor(accountJid));
@@ -618,9 +813,9 @@ export const AuthProvider: ParentComponent = (props) => {
         const result = await c.searchHistory({
             with: conversationJid,
             paging: { max },
-        } as any);
+        } as any) as HistorySearchResult;
 
-        applyMAMResults((result as any)?.results);
+        applyMAMResults(result.results);
         applyMAMPaging(conversationJid, result, 'latest');
     };
 
@@ -632,9 +827,9 @@ export const AuthProvider: ParentComponent = (props) => {
         const result = await c.searchHistory({
             with: conversationJid,
             paging: { max, before },
-        } as any);
+        } as any) as HistorySearchResult;
 
-        applyMAMResults((result as any)?.results);
+        applyMAMResults(result.results);
         applyMAMPaging(conversationJid, result, 'older');
     };
 
@@ -661,12 +856,55 @@ export const AuthProvider: ParentComponent = (props) => {
         setSettings((prev) => ({ ...prev, resource: nextResource }));
     };
 
-    createEffect((previousResource) => {
-        const currentResource = settings().resource;
-        if (previousResource !== undefined && previousResource !== currentResource && creds()) {
+    const setPresence = (presence: PresenceState) => {
+        const nextShow = presence.show;
+        const nextStatus = presence.status.trim();
+        const nextPresence: PresenceState = {
+            show: nextShow,
+            status: nextStatus,
+        };
+
+        setSettings((previous) => ({
+            ...previous,
+            presence: nextPresence,
+        }));
+
+        const c = client();
+        if (!c || !hasSession()) return;
+
+        c.sendPresence({
+            show: nextPresence.show === 'online' ? undefined : nextPresence.show,
+            status: nextPresence.status || undefined,
+        });
+
+        const selfJid = toBareJid(creds()?.jid);
+        if (selfJid) {
+            patchContact(selfJid, {
+                presence: normalizePresence(nextPresence.show),
+                statusText: nextPresence.status,
+            });
+        }
+    };
+
+    createEffect((previousKey) => {
+        const c = creds();
+        const currentKey = c ? `${c.jid}|${settings().resource}` : '';
+
+        if (!c) {
+            setIsBootstrapping(false);
+            return currentKey;
+        }
+
+        if (!previousKey) {
+            setupClient('restore');
+            return currentKey;
+        }
+
+        if (previousKey !== currentKey) {
             setupClient('resource-change');
         }
-        return currentResource;
+
+        return currentKey;
     });
 
     createEffect((previousJid) => {
@@ -685,22 +923,54 @@ export const AuthProvider: ParentComponent = (props) => {
     });
 
     const privateChats = createMemo<PrivateChatSummary[]>(() => {
-        const ids = new Set<string>([...rosterJids(), ...Object.keys(messagesByConversation)]);
+        const ids = new Set<string>([...Object.keys(contactsByJid), ...Object.keys(messagesByConversation)]);
+        const selfJid = toBareJid(creds()?.jid);
         const chats = Array.from(ids)
-            .filter(Boolean)
+            .filter((jid) => Boolean(jid) && jid !== selfJid)
             .map((jid) => {
                 const items = messagesByConversation[jid] || [];
                 const lastMessage = items.length > 0 ? items[items.length - 1] : undefined;
+                const contact = contactsByJid[jid];
                 return {
                     jid,
+                    name: contact?.name,
+                    avatarUrl: contact?.avatarUrl,
+                    presence: contact?.presence || 'offline',
+                    statusText: contact?.statusText,
                     lastMessage,
                     unreadCount: conversationMeta[jid]?.unreadCount || 0,
                     lastReadAt: conversationMeta[jid]?.lastReadAt,
                     hasOlder: conversationMeta[jid]?.hasOlder || false,
                 };
             });
-        chats.sort((a, b) => (b.lastMessage?.timestamp || 0) - (a.lastMessage?.timestamp || 0));
+        chats.sort((a, b) => {
+            const byRecent = (b.lastMessage?.timestamp || 0) - (a.lastMessage?.timestamp || 0);
+            if (byRecent !== 0) return byRecent;
+            return a.jid.localeCompare(b.jid);
+        });
         return chats;
+    });
+
+    const contacts = createMemo<ContactProfile[]>(() => {
+        const selfJid = toBareJid(creds()?.jid);
+        return Object.values(contactsByJid)
+            .filter((contact) => contact.jid !== selfJid)
+            .sort((a, b) => {
+                const aOnline = a.presence !== 'offline';
+                const bOnline = b.presence !== 'offline';
+                if (aOnline !== bOnline) return bOnline ? 1 : -1;
+                return (a.name || a.jid).localeCompare(b.name || b.jid);
+            });
+    });
+
+    const profile = createMemo<ContactProfile | undefined>(() => {
+        const selfJid = toBareJid(creds()?.jid);
+        if (!selfJid) return undefined;
+        return contactsByJid[selfJid] || {
+            jid: selfJid,
+            presence: normalizePresence(settings().presence.show),
+            statusText: settings().presence.status,
+        };
     });
 
     const hasOlderMessages = (conversationJid: string) => {
@@ -710,8 +980,12 @@ export const AuthProvider: ParentComponent = (props) => {
     const value: AuthContextType = {
         isAuthed,
         isConnecting,
+        isBootstrapping,
         jid: () => creds()?.jid,
         resource: () => settings().resource,
+        profile,
+        contacts,
+        presence: () => settings().presence,
         login,
         logout,
         setResource,
@@ -722,6 +996,7 @@ export const AuthProvider: ParentComponent = (props) => {
         hasOlderMessages,
         markConversationRead,
         sendChat,
+        setPresence,
         omemo: {
             canUse: omemoAvailable,
             setEnabled: (enabled) => setOmemoEnabled(enabled),

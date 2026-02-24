@@ -1,6 +1,8 @@
 import { useSearchParams } from "@solidjs/router";
 import { Component, createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import { useAuth } from "../auth/provider";
+import { Jid } from "../components/jid";
+import { Avatar } from "../components/avatar";
 
 export const MessagesRoute: Component = () => {
     const {
@@ -38,6 +40,11 @@ export const MessagesRoute: Component = () => {
         const jid = activeChat();
         if (!jid) return [];
         return messagesFor(jid);
+    });
+
+    const activeSummary = createMemo(() => {
+        const jid = activeChat();
+        return privateChats().find((chat) => chat.jid === jid);
     });
 
     createEffect((previousJid) => {
@@ -99,7 +106,13 @@ export const MessagesRoute: Component = () => {
             <div class="flex-1 flex flex-col">
                 <div class="border-b border-neutral-800 px-4 py-3">
                     <Show when={activeChat()} fallback={<span class="text-neutral-400">Select a chat from the sidebar</span>}>
-                        <span class="font-medium">{activeChat()}</span>
+                        <div class="flex items-center gap-2">
+                            <Avatar jid={activeSummary()?.jid} name={activeSummary()?.name} src={activeSummary()?.avatarUrl} size={28} />
+                            <div>
+                                <Jid jid={activeChat()} class="font-medium" localClass="text-white" domainClass="opacity-90" />
+                                <p class="text-xs text-neutral-400">{activeSummary()?.statusText || activeSummary()?.presence || 'offline'}</p>
+                            </div>
+                        </div>
                     </Show>
                 </div>
 
@@ -140,7 +153,7 @@ export const MessagesRoute: Component = () => {
                                     </div>
                                 )}
                             </For>
-                            </div>
+                        </div>
                     </Show>
                 </div>
 

@@ -1,10 +1,11 @@
-import { createEffect, ParentComponent, Show, type Component } from 'solid-js';
+import { ParentComponent, Show, type Component } from 'solid-js';
 import { useAuth } from './auth/provider';
 import { Login } from './auth/login';
-import { Sidebar, Sidebarred } from './sidebar';
-import { Route, Router, RouteSectionProps } from '@solidjs/router';
+import { Sidebarred } from './sidebar';
+import { Route } from '@solidjs/router';
 import { ServerOverviewRoute } from './routes/server';
 import { ServerChannelRoute } from './routes/server/channel';
+import { MessagesRoute } from './routes/messages';
 
 const Home = () => {
   return (
@@ -32,6 +33,7 @@ export const App: Component = () => {
       <Show when={isAuthed()}>
         <Route path="/" component={Shell}>
           <Route path="/" component={Home} />
+          <Route path="/messages" component={MessagesRoute} />
           <Route path="/server/:groupId" component={ServerOverviewRoute} />
           <Route path="/server/:groupId/:channelId" component={ServerChannelRoute} />
         </Route>

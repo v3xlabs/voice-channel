@@ -1,11 +1,10 @@
-import { createResource, For, ParentComponent, Show, Suspense } from "solid-js";
+import { createMemo, For, ParentComponent, Show } from "solid-js";
 import { ServerGroup } from "./server";
 import { SidebarSettings } from "./settings";
-import { useParams } from "@solidjs/router";
 import { useAuth } from "../auth/provider";
 import { SidebarActivity } from "./activity";
-import { BsHash } from "solid-icons/bs";
 import { ServerChannels } from "./channels";
+import { BsChatDots } from "solid-icons/bs";
 
 export type Server = {
     name: string;
@@ -20,6 +19,11 @@ export type Group = {
 }
 
 export const Sidebar = () => {
+    const { privateChats } = useAuth();
+    const unreadTotal = createMemo(() => {
+        return privateChats().reduce((total, chat) => total + chat.unreadCount, 0);
+    });
+
     const servers: Server[] = [
         {
             name: 'Voice Channel',
@@ -74,7 +78,20 @@ export const Sidebar = () => {
     return (
         <div class="h-screen flex relative">
             <div class="w-[72px] bg-neutral-900 h-full flex flex-col gap-2 items-center p-2">
-                <a href="/">Home</a>
+                <div class="relative">
+                    <a
+                        href="/messages"
+                        title="Messages"
+                        class="w-10 h-10 rounded-md bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center text-white"
+                    >
+                        <BsChatDots />
+                    </a>
+                    <Show when={unreadTotal() > 0}>
+                        <div class="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-cyan-600 text-[11px] flex items-center justify-center">
+                            {unreadTotal()}
+                        </div>
+                    </Show>
+                </div>
                 <For each={servers}>
                     {(server) => (
                         <ServerGroup server={server} />

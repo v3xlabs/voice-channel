@@ -1,23 +1,11 @@
-import { Route, RouteSectionProps, useParams } from "@solidjs/router";
-import { Component, createResource, Show, Suspense } from "solid-js";
-import { useAuth } from "../../auth/provider";
+import { RouteSectionProps } from "@solidjs/router";
+import { Component } from "solid-js";
 
 export const ServerOverviewRoute: Component<RouteSectionProps<{ groupId: string }>> = ({ params: { groupId } }) => {
-    const { fetchApi } = useAuth();
-    const [channels] = createResource(async () => {
-        return fetchApi()('/health', 'get', {});
-    });
-
     return (
         <div class="p-4">
             Server {groupId}
-            <Suspense fallback={<div>Loading...</div>}>
-                <Show when={channels()}>
-                    <div>
-                        {channels()?.data}
-                    </div>
-                </Show>
-            </Suspense>
+            <div class="mt-2 text-sm text-neutral-400">Server overview is currently XMPP-only and does not call REST APIs.</div>
         </div>
     )
 };

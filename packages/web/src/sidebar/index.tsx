@@ -4,6 +4,8 @@ import { SidebarSettings } from "./settings";
 import { useParams } from "@solidjs/router";
 import { useAuth } from "../auth/provider";
 import { SidebarActivity } from "./activity";
+import { BsHash } from "solid-icons/bs";
+import { ServerChannels } from "./channels";
 
 export type Server = {
     name: string;
@@ -94,43 +96,6 @@ export const Sidebar = () => {
     )
 };
 
-const ServerChannels = () => {
-    const params = useParams<{ groupId: string }>();
-    const { fetchApi } = useAuth();
-    const [channels] = createResource(async () => {
-        return (await fetchApi()('/channels', 'get', {})).data;
-    });
-
-    return (
-        <Show when={params.groupId}>
-            <div class="p-4">
-                <h1>Server Channels {params.groupId}</h1>
-                <Suspense fallback={<div>Loading...</div>}>
-                    <Show when={channels()} keyed>
-                        <ul>
-                            <For each={channels()}>
-                                {(channel) => (
-                                    <li
-                                        classList={{
-                                            'hover:bg-neutral-700': true,
-                                        }}
-                                    >
-                                        <a
-                                            href={`/server/${channel.group_id}/${channel.channel_id}`}
-                                            class="w-full h-full block"
-                                        >
-                                            {channel.name}
-                                        </a>
-                                    </li>
-                                )}
-                            </For>
-                        </ul>
-                    </Show>
-                </Suspense>
-            </div>
-        </Show>
-    )
-};
 
 export const Sidebarred: ParentComponent = (props) => {
     return (

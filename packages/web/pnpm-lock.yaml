@@ -20,6 +20,9 @@ importers:
       '@zag-js/solid':
         specifier: ^1.33.1
         version: 1.33.1(solid-js@1.9.9)
+      events:
+        specifier: ^3.3.0
+        version: 3.3.0
       openapi-hooks:
         specifier: ^0.0.6
         version: 0.0.6(jiti@2.5.1)(postcss@8.5.6)(typescript@5.9.2)
@@ -29,16 +32,19 @@ importers:
       solid-js:
         specifier: ^1.9.9
         version: 1.9.9
+      stanza:
+        specifier: ^12.21.1
+        version: 12.21.1
     devDependencies:
       '@tailwindcss/vite':
         specifier: ^4.1.13
-        version: 4.1.13(vite@7.1.10(jiti@2.5.1)(lightningcss@1.30.1)(tsx@4.21.0))
+        version: 4.1.13(vite@7.1.10(@types/node@22.19.11)(jiti@2.5.1)(lightningcss@1.30.1)(tsx@4.21.0))
       openapi-typescript:
         specifier: ^7.4.0
         version: 7.13.0(typescript@5.9.2)
       solid-devtools:
         specifier: ^0.34.3
-        version: 0.34.3(solid-js@1.9.9)(vite@7.1.10(jiti@2.5.1)(lightningcss@1.30.1)(tsx@4.21.0))
+        version: 0.34.3(solid-js@1.9.9)(vite@7.1.10(@types/node@22.19.11)(jiti@2.5.1)(lightningcss@1.30.1)(tsx@4.21.0))
       tailwindcss:
         specifier: ^4.1.13
         version: 4.1.13
@@ -47,10 +53,10 @@ importers:
         version: 5.9.2
       vite:
         specifier: ^7.1.4
-        version: 7.1.10(jiti@2.5.1)(lightningcss@1.30.1)(tsx@4.21.0)
+        version: 7.1.10(@types/node@22.19.11)(jiti@2.5.1)(lightningcss@1.30.1)(tsx@4.21.0)
       vite-plugin-solid:
         specifier: ^2.11.8
-        version: 2.11.9(solid-js@1.9.9)(vite@7.1.10(jiti@2.5.1)(lightningcss@1.30.1)(tsx@4.21.0))
+        version: 2.11.9(solid-js@1.9.9)(vite@7.1.10(@types/node@22.19.11)(jiti@2.5.1)(lightningcss@1.30.1)(tsx@4.21.0))
 
 packages:
 
@@ -827,6 +833,15 @@ packages:
   '@types/estree@1.0.8':
     resolution: {integrity: sha512-dWHzHa2WqEXI/O1E9OjrocMTKJl2mSrEolh1Iomrv6U+JuNwaHXsXx9bLu5gG7BUWFIN0skIQJQ/L1rIex4X6w==}
 
+  '@types/node@22.19.11':
+    resolution: {integrity: sha512-BH7YwL6rA93ReqeQS1c4bsPpcfOmJasG+Fkr6Y59q83f9M1WcBRHR2vM+P9eOisYRcN3ujQoiZY8uk5W+1WL8w==}
+
+  '@types/punycode@2.1.4':
+    resolution: {integrity: sha512-trzh6NzBnq8yw5e35f8xe8VTYjqM3NE7bohBtvDVf/dtUer3zYTLK1Ka3DG3p7bdtoaOHZucma6FfVKlQ134pQ==}
+
+  '@types/ws@8.18.1':
+    resolution: {integrity: sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg==}
+
   '@zag-js/anatomy@1.33.1':
     resolution: {integrity: sha512-iME14VHGGEPNMakilI6qvEkv9sll4AFZHpeoMLpczesw5hmqQjjNRifDTPR+idqCb8O8PdkAPE9hyMeP+4JjtA==}
 
@@ -993,6 +1008,10 @@ packages:
   escalade@3.2.0:
     resolution: {integrity: sha512-WUj2qlxaQtO4g6Pq5c29GTcWGDyd8itL8zTlipgECz3JesAiiOKotd8JU6otB3PACgG6xkJUyVhboMS+bje/jA==}
     engines: {node: '>=6'}
+
+  events@3.3.0:
+    resolution: {integrity: sha512-mQw+2fkQbALzQ7V0MY0IqdnXNOeTtP4r0lN9z7AAawCXgqea7bDii20AYrIBrFd/Hx0M2Ocz6S111CaFkUcb0Q==}
+    engines: {node: '>=0.8.x'}
 
   fast-deep-equal@3.1.3:
     resolution: {integrity: sha512-f3qQ9oQy9j2AhBe/H9VC91wLmKBCCU/gDOnKNAYG5hswO7BLKj09Hc5HYNz9cGI++xlpDCIgDaitVs03ATR84Q==}
@@ -1259,6 +1278,10 @@ packages:
   proxy-compare@3.0.1:
     resolution: {integrity: sha512-V9plBAt3qjMlS1+nC8771KNf6oJ12gExvaxnNzN/9yVRLdTv/lc+oJlnSzrdYDAvBfTStPCoiaCOTmTs0adv7Q==}
 
+  punycode@2.3.1:
+    resolution: {integrity: sha512-vYt7UD1U9Wg6138shLtLOvdAu+8DsC/ilFtEVHcH+wydcSpNE20AfSOduf6MkRFahL5FY7X1oU7nKVZFtfq8Fg==}
+    engines: {node: '>=6'}
+
   readdirp@4.1.2:
     resolution: {integrity: sha512-GDhwkLfywWL2s6vEjyhri+eXmfH6j1L7JE27WhqLeYzoh/A3DBaYGEj2H/HFZCn/kMfim73FXxEJTw06WtxQwg==}
     engines: {node: '>= 14.18.0'}
@@ -1278,6 +1301,9 @@ packages:
     resolution: {integrity: sha512-3GuObel8h7Kqdjt0gxkEzaifHTqLVW56Y/bjN7PSQtkKr0w3V/QYSdt6QWYtd7A1xUtYQigtdUfgj1RvWVtorw==}
     engines: {node: '>=18.0.0', npm: '>=8.0.0'}
     hasBin: true
+
+  sdp@3.2.1:
+    resolution: {integrity: sha512-lwsAIzOPlH8/7IIjjz3K0zYBk7aBVVcvjMwt3M4fLxpjMYyy7i3I97SLHebgn4YBjirkzfp3RvRDWSKsh/+WFw==}
 
   semver@6.3.1:
     resolution: {integrity: sha512-BR7VvDCVHO+q2xBEWskxS6DJE1qRnb7DxzUrogb71CWoSficBxYsiAGd+Kl0mmq/MprG9yArRkyrQxTO6XjMzA==}
@@ -1332,6 +1358,9 @@ packages:
   source-map@0.7.6:
     resolution: {integrity: sha512-i5uvt8C3ikiWeNZSVZNWcfZPItFQOsYTUAOkcUPGd8DqDy1uOUikjt5dG+uRlwyvR108Fb9DOd4GvXfT0N2/uQ==}
     engines: {node: '>= 12'}
+
+  stanza@12.21.1:
+    resolution: {integrity: sha512-qfLx32k3DJfbJekCIcAzUcJuh9aWnXqhDcEap3E8yhiwUoIsX3JA0qupWSEw2T3YtNta1NqUp+zcpzpLNYOp4Q==}
 
   sucrase@3.35.1:
     resolution: {integrity: sha512-DhuTmvZWux4H1UOnWMB3sk0sbaCVOoQZjv8u1rDoTV0HTdGem9hkAZtl4JZy8P2z4Bg0nT+YMeOFyVr4zcG5Tw==}
@@ -1413,6 +1442,9 @@ packages:
   ufo@1.6.3:
     resolution: {integrity: sha512-yDJTmhydvl5lJzBmy/hyOAA0d+aqCBuwl818haVdYCRrWV84o7YyeVm4QlVHStqNrrJSTb6jKuFAVqAFsr+K3Q==}
 
+  undici-types@6.21.0:
+    resolution: {integrity: sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==}
+
   update-browserslist-db@1.1.3:
     resolution: {integrity: sha512-UxhIZQ+QInVdunkDAaiazvvT/+fXL5Osr0JZlJulepYu6Jd7qJtDZjlur0emRlT71EN3ScPoE7gvsuIKKNavKw==}
     hasBin: true
@@ -1478,6 +1510,18 @@ packages:
       vite: ^3.0.0 || ^4.0.0 || ^5.0.0 || ^6.0.0 || ^7.0.0-beta.0
     peerDependenciesMeta:
       vite:
+        optional: true
+
+  ws@8.19.0:
+    resolution: {integrity: sha512-blAT2mjOEIi0ZzruJfIhb3nps74PRWTCz1IjglWEEpQl5XS/UNama6u2/rjFkDDouqr4L67ry+1aGIALViWjDg==}
+    engines: {node: '>=10.0.0'}
+    peerDependencies:
+      bufferutil: ^4.0.1
+      utf-8-validate: '>=5.0.2'
+    peerDependenciesMeta:
+      bufferutil:
+        optional: true
+      utf-8-validate:
         optional: true
 
   yallist@3.1.1:
@@ -2116,12 +2160,12 @@ snapshots:
       '@tailwindcss/oxide-win32-arm64-msvc': 4.1.13
       '@tailwindcss/oxide-win32-x64-msvc': 4.1.13
 
-  '@tailwindcss/vite@4.1.13(vite@7.1.10(jiti@2.5.1)(lightningcss@1.30.1)(tsx@4.21.0))':
+  '@tailwindcss/vite@4.1.13(vite@7.1.10(@types/node@22.19.11)(jiti@2.5.1)(lightningcss@1.30.1)(tsx@4.21.0))':
     dependencies:
       '@tailwindcss/node': 4.1.13
       '@tailwindcss/oxide': 4.1.13
       tailwindcss: 4.1.13
-      vite: 7.1.10(jiti@2.5.1)(lightningcss@1.30.1)(tsx@4.21.0)
+      vite: 7.1.10(@types/node@22.19.11)(jiti@2.5.1)(lightningcss@1.30.1)(tsx@4.21.0)
 
   '@types/babel__core@7.20.5':
     dependencies:
@@ -2145,6 +2189,16 @@ snapshots:
       '@babel/types': 7.28.4
 
   '@types/estree@1.0.8': {}
+
+  '@types/node@22.19.11':
+    dependencies:
+      undici-types: 6.21.0
+
+  '@types/punycode@2.1.4': {}
+
+  '@types/ws@8.18.1':
+    dependencies:
+      '@types/node': 22.19.11
 
   '@zag-js/anatomy@1.33.1': {}
 
@@ -2353,6 +2407,8 @@ snapshots:
       '@esbuild/win32-x64': 0.27.3
 
   escalade@3.2.0: {}
+
+  events@3.3.0: {}
 
   fast-deep-equal@3.1.3: {}
 
@@ -2571,6 +2627,8 @@ snapshots:
 
   proxy-compare@3.0.1: {}
 
+  punycode@2.3.1: {}
+
   readdirp@4.1.2: {}
 
   require-from-string@2.0.2: {}
@@ -2607,6 +2665,8 @@ snapshots:
       '@rollup/rollup-win32-x64-msvc': 4.52.5
       fsevents: 2.3.3
 
+  sdp@3.2.1: {}
+
   semver@6.3.1: {}
 
   seroval-plugins@1.3.3(seroval@1.3.2):
@@ -2615,7 +2675,7 @@ snapshots:
 
   seroval@1.3.2: {}
 
-  solid-devtools@0.34.3(solid-js@1.9.9)(vite@7.1.10(jiti@2.5.1)(lightningcss@1.30.1)(tsx@4.21.0)):
+  solid-devtools@0.34.3(solid-js@1.9.9)(vite@7.1.10(@types/node@22.19.11)(jiti@2.5.1)(lightningcss@1.30.1)(tsx@4.21.0)):
     dependencies:
       '@babel/core': 7.28.4
       '@babel/plugin-syntax-typescript': 7.27.1(@babel/core@7.28.4)
@@ -2624,7 +2684,7 @@ snapshots:
       '@solid-devtools/shared': 0.20.0(solid-js@1.9.9)
       solid-js: 1.9.9
     optionalDependencies:
-      vite: 7.1.10(jiti@2.5.1)(lightningcss@1.30.1)(tsx@4.21.0)
+      vite: 7.1.10(@types/node@22.19.11)(jiti@2.5.1)(lightningcss@1.30.1)(tsx@4.21.0)
     transitivePeerDependencies:
       - supports-color
 
@@ -2660,6 +2720,18 @@ snapshots:
   source-map-js@1.2.1: {}
 
   source-map@0.7.6: {}
+
+  stanza@12.21.1:
+    dependencies:
+      '@types/node': 22.19.11
+      '@types/punycode': 2.1.4
+      '@types/ws': 8.18.1
+      punycode: 2.3.1
+      sdp: 3.2.1
+      ws: 8.19.0
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
 
   sucrase@3.35.1:
     dependencies:
@@ -2748,6 +2820,8 @@ snapshots:
 
   ufo@1.6.3: {}
 
+  undici-types@6.21.0: {}
+
   update-browserslist-db@1.1.3(browserslist@4.25.4):
     dependencies:
       browserslist: 4.25.4
@@ -2756,7 +2830,7 @@ snapshots:
 
   validate-html-nesting@1.2.3: {}
 
-  vite-plugin-solid@2.11.9(solid-js@1.9.9)(vite@7.1.10(jiti@2.5.1)(lightningcss@1.30.1)(tsx@4.21.0)):
+  vite-plugin-solid@2.11.9(solid-js@1.9.9)(vite@7.1.10(@types/node@22.19.11)(jiti@2.5.1)(lightningcss@1.30.1)(tsx@4.21.0)):
     dependencies:
       '@babel/core': 7.28.4
       '@types/babel__core': 7.20.5
@@ -2764,12 +2838,12 @@ snapshots:
       merge-anything: 5.1.7
       solid-js: 1.9.9
       solid-refresh: 0.6.3(solid-js@1.9.9)
-      vite: 7.1.10(jiti@2.5.1)(lightningcss@1.30.1)(tsx@4.21.0)
-      vitefu: 1.1.1(vite@7.1.10(jiti@2.5.1)(lightningcss@1.30.1)(tsx@4.21.0))
+      vite: 7.1.10(@types/node@22.19.11)(jiti@2.5.1)(lightningcss@1.30.1)(tsx@4.21.0)
+      vitefu: 1.1.1(vite@7.1.10(@types/node@22.19.11)(jiti@2.5.1)(lightningcss@1.30.1)(tsx@4.21.0))
     transitivePeerDependencies:
       - supports-color
 
-  vite@7.1.10(jiti@2.5.1)(lightningcss@1.30.1)(tsx@4.21.0):
+  vite@7.1.10(@types/node@22.19.11)(jiti@2.5.1)(lightningcss@1.30.1)(tsx@4.21.0):
     dependencies:
       esbuild: 0.25.11
       fdir: 6.5.0(picomatch@4.0.3)
@@ -2778,14 +2852,17 @@ snapshots:
       rollup: 4.52.5
       tinyglobby: 0.2.15
     optionalDependencies:
+      '@types/node': 22.19.11
       fsevents: 2.3.3
       jiti: 2.5.1
       lightningcss: 1.30.1
       tsx: 4.21.0
 
-  vitefu@1.1.1(vite@7.1.10(jiti@2.5.1)(lightningcss@1.30.1)(tsx@4.21.0)):
+  vitefu@1.1.1(vite@7.1.10(@types/node@22.19.11)(jiti@2.5.1)(lightningcss@1.30.1)(tsx@4.21.0)):
     optionalDependencies:
-      vite: 7.1.10(jiti@2.5.1)(lightningcss@1.30.1)(tsx@4.21.0)
+      vite: 7.1.10(@types/node@22.19.11)(jiti@2.5.1)(lightningcss@1.30.1)(tsx@4.21.0)
+
+  ws@8.19.0: {}
 
   yallist@3.1.1: {}
 

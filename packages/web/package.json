@@ -25,8 +25,10 @@
     "@solidjs/router": "^0.15.4",
     "@zag-js/menu": "^1.33.1",
     "@zag-js/solid": "^1.33.1",
+    "events": "^3.3.0",
     "openapi-hooks": "^0.0.6",
     "solid-icons": "^1.2.0",
-    "solid-js": "^1.9.9"
+    "solid-js": "^1.9.9",
+    "stanza": "^12.21.1"
   }
 }

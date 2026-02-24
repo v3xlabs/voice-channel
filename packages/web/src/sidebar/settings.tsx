@@ -1,16 +1,17 @@
-import { BsGear } from "solid-icons/bs";
+import { BsBoxArrowRight, BsGear, BsMusicNote } from "solid-icons/bs";
 import { useAuth } from "../auth/provider";
-import { createMemo, createSignal, createUniqueId } from "solid-js";
+import { createMemo, createSignal, createUniqueId, For } from "solid-js";
 import { normalizeProps, useMachine } from "@zag-js/solid";
 import * as menu from '@zag-js/menu';
 
 export const SidebarSettings = () => {
     const { logout } = useAuth();
-    const service = useMachine(menu.machine, { id: createUniqueId(),
+    const service = useMachine(menu.machine, {
+        id: createUniqueId(),
         positioning: {
             // fitViewport: true,
             // gutter: 8,
-            placement: 'top'
+            placement: 'top-start'
         },
         // open: true,
         onSelect: (e) => {
@@ -20,7 +21,7 @@ export const SidebarSettings = () => {
                 logout();
             }
         }
-     })
+    })
     const api = createMemo(() => menu.connect(service, normalizeProps));
 
     return (
@@ -38,10 +39,19 @@ export const SidebarSettings = () => {
                 // aria-labelledby="sidebar-settings-button"
                 {...api().getPositionerProps()}
             >
-                <ul class="bg-neutral-800 border border-neutral-700 p-0.5 rounded-lg data-[focus]:outline-none focus:outline-none" {...api().getContentProps()}>
-                    <li {...api().getItemProps({ value: 'settings', closeOnSelect: true })} class="menu-item">Settings</li>
-                    <li {...api().getItemProps({ value: 'audio', closeOnSelect: true })} class="menu-item">Audio</li>
-                    <li {...api().getItemProps({ value: 'logout', closeOnSelect: true })} class="menu-item">Logout</li>
+                <ul class="bg-neutral-800 border border-neutral-700 p-0.5 w-screen max-w-38 rounded-lg data-[focus]:outline-none focus:outline-none" {...api().getContentProps()}>
+                    <For each={[
+                        ['settings', <BsGear />, 'Settings'],
+                        ['audio', <BsMusicNote />, 'Audio'],
+                        ['logout', <BsBoxArrowRight />, 'Logout'],
+                    ] as const}>
+                        {([value, icon, label]) => (
+                            <li {...api().getItemProps({ value, closeOnSelect: true })} class="menu-item">
+                                {icon}
+                                {label}
+                            </li>
+                        )}
+                    </For>
                 </ul>
             </div>
         </div>

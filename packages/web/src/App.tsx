@@ -22,7 +22,7 @@ const Shell: ParentComponent = (props) => {
 }
 
 export const App: Component = () => {
-  const { isAuthed, logout } = useAuth();
+  const { isAuthed } = useAuth();
 
   return (
     <>

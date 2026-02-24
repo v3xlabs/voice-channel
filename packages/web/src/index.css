@@ -34,7 +34,7 @@
 }
 
 .menu-item {
-    @apply data-[highlighted]:bg-neutral-700 px-2 py-1 rounded-sm cursor-pointer;
+    @apply data-[highlighted]:bg-neutral-700 px-2 py-1 rounded-sm cursor-pointer flex items-center gap-2;
 }
 
 .context-menu__content,
@@ -63,12 +63,11 @@
 .context-menu__checkbox-item,
 .context-menu__radio-item,
 .context-menu__sub-trigger {
-    @apply h-8;
+    @apply h-8 flex gap-1;
     font-size: 14px;
     line-height: 1;
     /* color: hsl(240 4% 16%); */
     border-radius: 4px;
-    display: flex;
     align-items: center;
     padding: 0 8px 0 8px;
     position: relative;

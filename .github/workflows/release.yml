@@ -58,14 +58,13 @@ jobs:
           workspaces: './src-tauri -> target'
 
       - name: install frontend dependencies
-        # If you don't have `beforeBuildCommand` configured you may want to build your frontend here too.
-        run: pnpm config set auto-install-peers false && pnpm install # change this to npm or pnpm depending on which one you use.
+        run: pnpm config set auto-install-peers false && pnpm install
 
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tagName: voice-channel-v__VERSION__ # the action automatically replaces \_\_VERSION\_\_ with the app version.
+          tagName: v__VERSION__
           releaseName: 'voice-channel v__VERSION__'
           releaseBody: 'See the assets to download this version and install.'
           releaseDraft: true

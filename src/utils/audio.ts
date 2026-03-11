@@ -1,28 +1,30 @@
-import { createEffect, createSignal, onCleanup, onMount } from "solid-js";
-// import type { AudioDevice, VideoDevice } from "@tauri-apps/plugin-media";
+import { createMemo, createSignal, onCleanup, onMount } from "solid-js";
 
 export const useAudioDevices = () => {
     const [devices, setDevices] = createSignal<MediaDeviceInfo[]>([]);
     const [media, setMedia] = createSignal<MediaStream | null>(null);
-    // const [audioDevices, setAudioDevices] = createSignal<AudioDevice[]>([]);
-    // const [videoDevices, setVideoDevices] = createSignal<VideoDevice[]>([]);
+    const [audioStream, setAudioStream] = createSignal<MediaStream | null>(null);
+    const [videoStream, setVideoStream] = createSignal<MediaStream | null>(null);
+
+    const requestVideoStream = async () => {
+        const media = await navigator.mediaDevices.getUserMedia({ video: true });
+
+        setMedia(media);
+    };
+
+    const requestAudioStream = async () => {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        setAudioStream(stream);
+    };
+
+    const requestScreenStream = async () => {
+        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        setVideoStream(stream);
+    };
 
     const updateDevices = async () => {
         const devices = await navigator.mediaDevices.enumerateDevices();
         setDevices(devices);
-        // const media = await navigator.mediaDevices.getDisplayMedia({ video: true });
-        // console.log(media);
-        // const media = await navigator.mediaDevices.getUserMedia({ video: true });
-        // console.log(media);
-        // setMedia(media);
-        for (const device of devices) {
-            if (device.kind === 'videoinput') {
-                // const media = await navigator.mediaDevices.getUserMedia({ video: { deviceId: device.deviceId } });
-                console.log(device);
-                console.log(location.href, location.origin, window.isSecureContext)
-                // setMedia(media);
-            }
-        }
     };
 
     onMount(() => {
@@ -34,8 +36,23 @@ export const useAudioDevices = () => {
         navigator.mediaDevices.removeEventListener('devicechange', updateDevices);
     });
 
+    const audioDevices = createMemo(() => {
+        return devices().filter((device) => device.kind === 'audioinput');
+    });
+
+    const videoDevices = createMemo(() => {
+        return devices().filter((device) => device.kind === 'videoinput');
+    });
+
     return {
-        devices,
+        audioDevices,
+        videoDevices,
         media,
+        requestVideoStream,
+        requestAudioStream,
+        requestScreenStream,
+        updateDevices,
+        audioStream,
+        videoStream,
     };
 };

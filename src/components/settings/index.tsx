@@ -10,7 +10,7 @@ export const SettingsMenu: Component = () => {
 
     return (
         <div class="fixed inset-0 z-[200] bg-black/50 flex items-center justify-center p-4">
-            <div class="w-full max-w-3xl rounded-lg border border-neutral-700 bg-neutral-900 overflow-hidden">
+            <div class="w-full max-w-3xl xl:max-w-5xl rounded-lg border border-neutral-700 bg-neutral-900 overflow-hidden">
                 <div class="border-b border-neutral-700 px-4 py-3">
                     <h2 class="text-lg font-medium">Settings</h2>
                 </div>

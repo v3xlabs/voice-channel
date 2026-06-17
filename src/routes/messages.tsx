@@ -3,6 +3,9 @@ import { Component, createEffect, createMemo, createSignal, For, Show } from "so
 import { useAuth } from "../auth/provider";
 import { Jid } from "../components/jid";
 import { Avatar } from "../components/avatar";
+import { ChatEncryptionBadge, ChatTrustBadge } from "../components/chat/encryption";
+import { ChatEncryptionDropdown } from "../components/chat/encryption-dropdown";
+import { BsArrowRepeat, BsExclamationTriangle, BsShieldLock } from "solid-icons/bs";
 
 export const MessagesRoute: Component = () => {
     const {
@@ -13,6 +16,8 @@ export const MessagesRoute: Component = () => {
         markConversationRead,
         messagesFor,
         sendChat,
+        isSyncing,
+        encryption,
     } = useAuth();
     const [search] = useSearchParams<{ chat?: string }>();
     const [draft, setDraft] = createSignal('');
@@ -56,6 +61,8 @@ export const MessagesRoute: Component = () => {
             markConversationRead(jid);
             requestAnimationFrame(() => scrollToBottom('auto'));
         });
+
+        void encryption.fetchContactDevices(jid);
 
         return jid;
     });
@@ -106,11 +113,21 @@ export const MessagesRoute: Component = () => {
             <div class="flex-1 flex flex-col">
                 <div class="border-b border-neutral-800 px-4 py-3">
                     <Show when={activeChat()} fallback={<span class="text-neutral-400">Select a chat from the sidebar</span>}>
-                        <div class="flex items-center gap-2">
-                            <Avatar jid={activeSummary()?.jid} name={activeSummary()?.name} src={activeSummary()?.avatarUrl} size={28} />
-                            <div>
-                                <Jid jid={activeChat()} class="font-medium" localClass="text-white" domainClass="opacity-90" />
-                                <p class="text-xs text-neutral-400">{activeSummary()?.statusText || activeSummary()?.presence || 'offline'}</p>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <Avatar jid={activeSummary()?.jid} name={activeSummary()?.name} src={activeSummary()?.avatarUrl} size={28} />
+                                <div>
+                                    <Jid jid={activeChat()} class="font-medium" localClass="text-white" domainClass="opacity-90" />
+                                    <p class="text-xs text-neutral-400">{activeSummary()?.statusText || activeSummary()?.presence || 'offline'}</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <Show when={isSyncing()}>
+                                    <BsArrowRepeat class="animate-spin text-cyan-400" />
+                                </Show>
+                                <ChatEncryptionBadge jid={activeChat()} />
+                                <ChatTrustBadge jid={activeChat()} />
+                                <ChatEncryptionDropdown jid={activeChat()} />
                             </div>
                         </div>
                     </Show>
@@ -138,20 +155,35 @@ export const MessagesRoute: Component = () => {
                                 </div>
                             </Show>
                             <For each={activeMessages()}>
-                                {(message) => (
-                                    <div
-                                        class="max-w-[70%] rounded-md px-3 py-2 text-sm"
-                                        classList={{
-                                            "bg-cyan-700": message.direction === 'out',
-                                            "bg-neutral-800": message.direction === 'in',
-                                        }}
-                                    >
-                                        <p>{message.body}</p>
-                                        <p class="text-[11px] text-neutral-300 mt-1">
-                                            {new Date(message.timestamp).toLocaleTimeString()} {message.encryption !== 'none' ? `- ${message.encryption}` : ''}
-                                        </p>
-                                    </div>
-                                )}
+                                {(message) => {
+                                    const contactTrusted = () => encryption.isContactTrusted(activeChat());
+                                    return (
+                                        <div
+                                            class="max-w-[70%] rounded-md px-3 py-2 text-sm"
+                                            classList={{
+                                                "bg-cyan-700": message.direction === 'out',
+                                                "bg-neutral-800": message.direction === 'in',
+                                            }}
+                                        >
+                                            <p>{message.body}</p>
+                                            <p class="text-[11px] text-neutral-300 mt-1 flex items-center gap-1">
+                                                {new Date(message.timestamp).toLocaleTimeString()}
+                                                {message.encryption !== 'none' && (
+                                                    <span class="flex items-center gap-0.5 text-green-300">
+                                                        <BsShieldLock />
+                                                        {message.encryption}
+                                                    </span>
+                                                )}
+                                                {message.direction === 'in' && message.encryption !== 'none' && !contactTrusted() && (
+                                                    <span class="flex items-center gap-0.5 text-yellow-400" title="Sender key is not trusted">
+                                                        <BsExclamationTriangle />
+                                                        untrusted
+                                                    </span>
+                                                )}
+                                            </p>
+                                        </div>
+                                    );
+                                }}
                             </For>
                         </div>
                     </Show>

@@ -1,5 +1,5 @@
 import { useLocation, useParams, useSearchParams } from "@solidjs/router";
-import { BsHash } from "solid-icons/bs";
+import { BsHash, BsArrowRepeat } from "solid-icons/bs";
 import { Show, For } from "solid-js";
 import { ContextMenu } from "@kobalte/core/context-menu";
 import { IdIcon } from "../icon";
@@ -80,11 +80,50 @@ const ChannelItem = (props: { channel: Channel, active: boolean }) => {
     )
 }
 
+const PendingInvites = () => {
+    const { pendingSubscriptions, acceptSubscription, denySubscription } = useAuth();
+    const invites = () => pendingSubscriptions();
+
+    return (
+        <Show when={invites().length > 0}>
+            <div class="px-2 pb-3">
+                <p class="px-2 pb-2 text-[11px] uppercase tracking-wide text-neutral-500">Contact requests</p>
+                <ul class="space-y-2">
+                    <For each={invites()}>
+                        {(contact) => (
+                            <li class="rounded-md border border-yellow-700/50 bg-yellow-950/20 px-3 py-2">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <Avatar jid={contact.jid} name={contact.name} src={contact.avatarUrl} size={24} />
+                                    <Jid jid={contact.jid} class="text-sm truncate" localClass="text-white" domainClass="opacity-90" />
+                                </div>
+                                <div class="flex gap-2">
+                                    <button
+                                        class="button button-secondary text-xs flex-1"
+                                        onClick={() => acceptSubscription(contact.jid)}
+                                    >
+                                        Accept
+                                    </button>
+                                    <button
+                                        class="button button-tertiary text-xs flex-1"
+                                        onClick={() => denySubscription(contact.jid)}
+                                    >
+                                        Decline
+                                    </button>
+                                </div>
+                            </li>
+                        )}
+                    </For>
+                </ul>
+            </div>
+        </Show>
+    );
+};
+
 export const ServerChannels = () => {
     const location = useLocation();
     const params = useParams<{ groupId: string, channelId: string }>();
     const [search] = useSearchParams<{ chat?: string }>();
-    const { privateChats } = useAuth();
+    const { privateChats, isSyncing } = useAuth();
     const isMessagesRoute = () => location.pathname.startsWith('/messages');
     const activeChat = () => search.chat || privateChats()[0]?.jid || '';
     const channels = () => CHANNELS.filter((channel) => channel.group_id === params.groupId);
@@ -93,7 +132,12 @@ export const ServerChannels = () => {
         <Show when={isMessagesRoute() || params.groupId}>
             <div class="w-full">
                 <Show when={isMessagesRoute()} fallback={<h1 class="p-4">Server Channels</h1>}>
-                    <h1 class="p-4">Messages</h1>
+                    <div class="flex items-center justify-between p-4">
+                        <h1>Messages</h1>
+                        <Show when={isSyncing()}>
+                            <BsArrowRepeat class="animate-spin text-cyan-400" />
+                        </Show>
+                    </div>
                 </Show>
 
                 <Show when={!isMessagesRoute()}>
@@ -109,6 +153,7 @@ export const ServerChannels = () => {
                 </Show>
 
                 <Show when={isMessagesRoute()}>
+                    <PendingInvites />
                     <Show when={privateChats().length > 0} fallback={<p class="px-4 text-neutral-400 text-sm">No private chats yet.</p>}>
                         <ul class="px-2 pb-2 space-y-1">
                             <For each={privateChats()}>

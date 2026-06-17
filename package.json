@@ -13,8 +13,14 @@
     "dist": "electron-builder"
   },
   "license": "GPL-3.0",
+  "author": {
+    "name": "V3X Labs",
+    "email": "info@v3x.email",
+    "url": "https://v3x.company"
+  },
   "dependencies": {
     "@kobalte/core": "^0.13.11",
+    "@privacyresearch/libsignal-protocol-typescript": "^0.0.16",
     "@solidjs/router": "^0.15.4",
     "@tailwindcss/vite": "^4.2.1",
     "@zag-js/menu": "^1.35.3",

@@ -1,12 +1,6 @@
-import { Component, createEffect, createSignal, For, Match, Show, Switch } from "solid-js";
+import { Component, createEffect, For, Show } from "solid-js";
 import { useAudioDevices } from "../../utils/audio";
 import { BsCameraVideo, BsMic } from "solid-icons/bs";
-
-// dynamic indicator that shows how loud the person is speaking, this is mic input so we need to derive how loud the person is
-const VolumeIndicator: Component<{ track: MediaStreamTrack }> = ({ track }) => {
-
-    return <div>{volume()}</div>
-}
 
 export const SettingsAV: Component = () => {
     const {
@@ -17,8 +11,6 @@ export const SettingsAV: Component = () => {
         requestAudioStream,
         requestScreenStream,
         updateDevices,
-        audioStream,
-        videoStream
     } = useAudioDevices();
     let videoRef: HTMLVideoElement | undefined;
 

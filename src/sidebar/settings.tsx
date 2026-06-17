@@ -1,6 +1,6 @@
 import { BsBoxArrowRight, BsGear, BsMusicNote } from "solid-icons/bs";
 import { useAuth } from "../auth/provider";
-import { createMemo, createSignal, createUniqueId, For, Show } from "solid-js";
+import { createMemo, createSignal, createUniqueId, For } from "solid-js";
 import { normalizeProps, useMachine } from "@zag-js/solid";
 import * as menu from '@zag-js/menu';
 import { SettingsMenu } from "../components/settings";
@@ -51,9 +51,7 @@ export const SidebarSettings = () => {
                 </ul>
             </div>
 
-            <Show when={isSettingsOpen()}>
-                <SettingsMenu />
-            </Show>
+            <SettingsMenu open={isSettingsOpen()} onOpenChange={setIsSettingsOpen} />
         </div>
     )
 };

@@ -6,11 +6,11 @@
 }
 
 .card {
-    @apply border p-4 w-full max-w-md rounded-md border-gray-300 bg-neutral-800;
+    @apply p-6 w-full max-w-md rounded-xl bg-neutral-800;
 }
 
 .button {
-    @apply px-4 py-2 rounded-md bg-neutral-700 text-white cursor-pointer;
+    @apply px-4 py-2 rounded-md cursor-pointer;
 
     &:hover {
         @apply brightness-110;
@@ -20,9 +20,25 @@
         @apply opacity-50 cursor-not-allowed;
     }
 
-    &.button-tertiary {
-        @apply bg-neutral-800;
+    &.button-primary {
+        @apply bg-neutral-200 text-neutral-800;
     }
+
+    &.button-secondary {
+        @apply bg-neutral-700 text-white;
+    }
+
+    &.button-tertiary {
+        @apply bg-neutral-900 text-white;
+    }
+
+    &.button-ghost {
+        @apply bg-transparent text-white;
+    }
+}
+
+.input {
+    @apply px-4 py-2 rounded-md bg-neutral-800 border border-neutral-700 text-white;
 }
 
 [data-part="content"][data-state="open"] {

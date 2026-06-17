@@ -1,12 +1,17 @@
-import { Accessor, createContext, createEffect, createMemo, createSignal, useContext, type ParentComponent } from "solid-js";
+import { Accessor, createContext, createEffect, createMemo, createSignal, onCleanup, useContext, type ParentComponent } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import { Agent, createClient } from 'stanza';
 import type { Credentials } from 'stanza/lib/sasl';
+import { OmemoManager } from '../encryption/omemo';
+import { createTrustStore } from '../encryption/trust';
+import { getTabId } from '../encryption/storage';
+import type { EncryptionMechanism, TrustLevel, ContactTrustSummary } from '../encryption/types';
 
 export type AuthContextType = {
     isAuthed: Accessor<boolean>;
     isConnecting: Accessor<boolean>;
     isBootstrapping: Accessor<boolean>;
+    isSyncing: Accessor<boolean>;
     jid: Accessor<string | undefined>;
     resource: Accessor<string>;
     profile: Accessor<ContactProfile | undefined>;
@@ -21,15 +26,37 @@ export type AuthContextType = {
     loadOlderMessages: (conversationJid: string, max?: number) => Promise<void>;
     hasOlderMessages: (conversationJid: string) => boolean;
     markConversationRead: (conversationJid: string) => void;
-    sendChat: (to: string, body: string) => string | undefined;
+    sendChat: (to: string, body: string) => Promise<string | undefined>;
     setPresence: (presence: PresenceState) => void;
+    pendingSubscriptions: Accessor<ContactProfile[]>;
+    acceptSubscription: (jid: string) => void;
+    denySubscription: (jid: string) => void;
+    addContact: (jid: string) => void;
     omemo: {
+        manager: Accessor<OmemoManager | undefined>;
         canUse: Accessor<boolean>;
         setEnabled: (enabled: boolean) => void;
         isEnabled: Accessor<boolean>;
         deviceIds: Accessor<number[]>;
         refreshDeviceList: () => Promise<void>;
-        publishDeviceList: (deviceIds: number[]) => Promise<void>;
+        publishDeviceList: (deviceIds: number[]) => Promise<number[]>;
+        republish: () => Promise<void>;
+        regenerateIdentity: () => Promise<void>;
+    };
+    encryption: {
+        getChatEncryption: (jid: string) => { mechanism: EncryptionMechanism; enabled: boolean };
+        setChatEncryption: (jid: string, mode: { mechanism: EncryptionMechanism; enabled: boolean }) => void;
+        setChatEncryptionEnabled: (jid: string, enabled: boolean) => void;
+        setChatEncryptionMechanism: (jid: string, mechanism: EncryptionMechanism) => void;
+        getDeviceTrust: (jid: string, deviceId: number) => TrustLevel;
+        setDeviceTrust: (jid: string, deviceId: number, level: TrustLevel) => void;
+        cycleDeviceTrust: (jid: string, deviceId: number) => void;
+        isContactTrusted: (jid: string) => boolean;
+        contactTrust: Accessor<ContactTrustSummary[]>;
+        getKnownContactDevices: (jid: string) => number[];
+        refreshContactDevices: (jid: string) => Promise<number[]>;
+        fetchContactDevices: (jid: string) => Promise<number[]>;
+        recordKey: (jid: string, deviceId: number, publicKey: ArrayBuffer) => void;
     };
 };
 
@@ -89,6 +116,7 @@ type ContactProfile = {
     avatarUrl?: string;
     avatarHash?: string;
     subscription?: string;
+    pendingSubscription?: boolean;
     presence: PresenceKind;
     statusText?: string;
 };
@@ -116,7 +144,12 @@ type HistorySearchResult = {
 
 const NS_OMEMO_DEVICELIST = 'eu.siacs.conversations.axolotl.devicelist';
 const NS_OMEMO_AXOLOTL = 'eu.siacs.conversations.axolotl';
-const OMEMO_DEVICELIST_ITEM_ID = 'current';
+const NS_OMEMO_BUNDLES = `${NS_OMEMO_AXOLOTL}.bundles`;
+const pepNotify = (node: string) => `${node}+notify`;
+
+// Module-level client reference that survives HMR cycles
+// Ensures old WebSocket is closed before new one opens
+let _activeClient: Agent | undefined;
 
 const parseJSON = <T,>(value: string | null, fallback: T): T => {
     if (!value) return fallback;
@@ -249,7 +282,21 @@ export const AuthProvider: ParentComponent = (props) => {
     const [omemoAvailable, setOmemoAvailable] = createSignal(false);
     const [omemoEnabled, setOmemoEnabled] = createSignal(false);
     const [omemoDeviceIds, setOmemoDeviceIds] = createSignal<number[]>([]);
+    const [isSyncing, setIsSyncing] = createSignal(false);
+    const [omemoManager, setOmemoManager] = createSignal<OmemoManager | undefined>(undefined);
+    const [trustStore, setTrustStore] = createSignal<ReturnType<typeof createTrustStore> | undefined>(undefined);
+    const [contactDeviceVersion, setContactDeviceVersion] = createSignal(0);
     const seenMessageIds = new Set<string>();
+
+    // Ensure the active XMPP client is disconnected when this component unmounts
+    // (e.g. during HMR reload). Uses the module-level ref so the old client is
+    // always disconnected before a new one connects.
+    onCleanup(() => {
+        if (_activeClient) {
+            _activeClient.disconnect();
+            _activeClient = undefined;
+        }
+    });
 
     const collectIncomingIds = (incoming: any) => {
         const ids: string[] = [];
@@ -355,11 +402,11 @@ export const AuthProvider: ParentComponent = (props) => {
         }
     };
 
-    const recordMessage = (incoming: any, archived: boolean, source: 'incoming' | 'outgoing' = 'incoming') => {
+    const recordMessage = (incoming: any, archived: boolean, source: 'incoming' | 'outgoing' = 'incoming', forcedBody?: string) => {
         const c = creds();
         if (!c) return;
 
-        const body = getMessageBody(incoming);
+        const body = forcedBody || getMessageBody(incoming);
         if (!body) return;
 
         const self = toBareJid(c.jid);
@@ -446,6 +493,67 @@ export const AuthProvider: ParentComponent = (props) => {
         }
     };
 
+    const processIncomingMessage = async (
+        incoming: any,
+        archived: boolean,
+        source: 'incoming' | 'outgoing' = 'incoming'
+    ) => {
+        const manager = omemoManager();
+        const omemoPayload = incoming?.omemo;
+        if (!omemoPayload || !manager) {
+            recordMessage(incoming, archived, source);
+            return;
+        }
+
+        const selfDeviceId = manager.getDeviceId();
+        const keyEntry = omemoPayload.header?.keys?.find(
+            (k: any) => Number(k.rid) === selfDeviceId
+        ) as any;
+
+        // If we have no identity yet or this message isn't for us, record placeholder
+        if (!selfDeviceId || !keyEntry) {
+            recordMessage(
+                incoming,
+                archived,
+                source,
+                '[OMEMO encrypted message — not encrypted for this device]'
+            );
+            return;
+        }
+
+        const fromJid = source === 'outgoing'
+            ? toBareJid(creds()?.jid)
+            : toBareJid(incoming.from);
+        const fromBare = fromJid;
+        const senderDeviceId = Number(omemoPayload.header.sid);
+
+        try {
+            // Record sender identity key for trust display (non-blocking, best-effort)
+            manager.ensureContactKeyStore(fromBare).then((keystore) => {
+                const bundle = keystore.bundles.find((b) => b.deviceId === senderDeviceId);
+                if (bundle) trustStore()?.recordKey(fromBare, senderDeviceId, bundle.identityKey);
+            });
+
+            const decrypted = await manager.decryptMessage(
+                fromJid,
+                senderDeviceId,
+                omemoPayload.header.iv,
+                keyEntry.value,
+                keyEntry.preKey === true,
+                omemoPayload.payload
+            );
+
+            if (decrypted) {
+                recordMessage(incoming, archived, source, decrypted);
+            } else {
+                recordMessage(incoming, archived, source, '[OMEMO — decryption failed]');
+            }
+        } catch (error) {
+            console.error('Error processing OMEMO message', error);
+            recordMessage(incoming, archived, source, '[OMEMO — decryption error]');
+        }
+    };
+
     const extractForwardedMessage = (archiveResult: any) => {
         if (!archiveResult) return undefined;
         if (archiveResult.item?.message) return archiveResult.item.message;
@@ -453,13 +561,13 @@ export const AuthProvider: ParentComponent = (props) => {
         return archiveResult.message;
     };
 
-    const applyMAMResults = (results: any[] | undefined) => {
+    const applyMAMResults = async (results: any[] | undefined) => {
         if (!results?.length) return;
         for (const item of results) {
             const forwarded = extractForwardedMessage(item);
             if (!forwarded) continue;
             if (forwarded.type && forwarded.type !== 'chat') continue;
-            recordMessage(forwarded, true, 'incoming');
+            await processIncomingMessage(forwarded, true);
         }
     };
 
@@ -488,14 +596,9 @@ export const AuthProvider: ParentComponent = (props) => {
         setConversationMeta(conversationJid, 'hasOlder', hasOlder);
     };
 
-    const detectOmemoSupport = async (xmpp: Agent, accountJid: string) => {
-        try {
-            const info = await xmpp.getDiscoInfo(toBareJid(accountJid));
-            const features = (info?.features || []).map((item: any) => item?.var || item).filter(Boolean);
-            setOmemoAvailable(features.includes(NS_OMEMO_DEVICELIST));
-        } catch {
-            setOmemoAvailable(false);
-        }
+    const getEffectiveResource = () => {
+        const base = settings().resource || DEFAULT_RESOURCE;
+        return `${base}.${getTabId().slice(0, 8)}`;
     };
 
     const refreshOmemoDeviceList = async () => {
@@ -504,9 +607,13 @@ export const AuthProvider: ParentComponent = (props) => {
         if (!xmpp || !accountJid) return;
 
         try {
-            const response = await xmpp.getItems(toBareJid(accountJid), NS_OMEMO_DEVICELIST, { max: 1 } as any);
-            const item = response?.items?.[0] as any;
-            const devices = item?.content?.devices || [];
+            const response = await xmpp.getItems(
+                toBareJid(accountJid),
+                NS_OMEMO_DEVICELIST,
+                { max: 1 }
+            );
+            const items = response?.items;
+            const devices = (items?.[0]?.content as any)?.devices || [];
             setOmemoDeviceIds(devices);
         } catch {
             setOmemoDeviceIds([]);
@@ -514,21 +621,39 @@ export const AuthProvider: ParentComponent = (props) => {
     };
 
     const publishOmemoDeviceList = async (deviceIds: number[]) => {
-        const xmpp = client();
-        const accountJid = creds()?.jid;
-        if (!xmpp || !accountJid || !omemoAvailable()) return;
+        const manager = omemoManager();
+        if (!manager) return [];
 
-        await xmpp.publish(
-            toBareJid(accountJid),
-            NS_OMEMO_DEVICELIST,
-            {
-                itemType: NS_OMEMO_DEVICELIST,
-                devices: Array.from(new Set(deviceIds)).sort((a, b) => a - b),
-            } as any,
-            OMEMO_DEVICELIST_ITEM_ID
-        );
+        try {
+            const devices = await manager.ensurePublished(deviceIds);
+            setOmemoDeviceIds(devices);
+            return devices;
+        } catch (error) {
+            console.error('Failed to publish OMEMO device list', error);
+            throw error;
+        }
+    };
 
-        setOmemoDeviceIds(Array.from(new Set(deviceIds)).sort((a, b) => a - b));
+    const republishOmemo = async () => {
+        const manager = omemoManager();
+        const c = client();
+        if (!manager) return;
+
+        try {
+            await manager.ensurePublished();
+            if (c) {
+                c.updateCaps();
+                const configuredPresence = settings().presence;
+                c.sendPresence({
+                    show: configuredPresence.show === 'online' ? undefined : configuredPresence.show,
+                    status: configuredPresence.status || undefined,
+                });
+            }
+        } catch (error) {
+            console.error('Failed to republish OMEMO keys', error);
+        } finally {
+            await refreshOmemoDeviceList();
+        }
     };
 
     const loadOwnProfile = async (xmpp: Agent, accountJid: string) => {
@@ -537,7 +662,7 @@ export const AuthProvider: ParentComponent = (props) => {
 
         try {
             const vcard = await xmpp.getVCard(bare);
-            const photo = (vcard?.records || []).find((record: any) => record?.type === 'photo');
+            const photo = (vcard?.records || []).find((record: any) => record?.type === 'photo') as any;
             const avatarUrl = photo?.data instanceof Uint8Array
                 ? toDataUrl(photo.data, photo.mediaType || 'image/jpeg')
                 : undefined;
@@ -551,9 +676,33 @@ export const AuthProvider: ParentComponent = (props) => {
         }
     };
 
+    let lifecycleCleanup: (() => void) | undefined;
+
     const setupClient = (reason: 'login' | 'restore' | 'resource-change') => {
         const { jid, credentials } = creds() ?? {};
         if (!jid || !credentials) return undefined;
+
+        const bareJid = toBareJid(jid);
+        let manager = omemoManager();
+        if (!manager) {
+            manager = new OmemoManager(bareJid);
+            setOmemoManager(manager);
+        }
+
+        if (!trustStore()) {
+            setTrustStore(createTrustStore(bareJid));
+        }
+
+        manager.setEncryptFilter((contactJid, deviceId) => {
+            return trustStore()?.shouldEncryptToDevice(contactJid, deviceId, bareJid) ?? true;
+        });
+
+        // Disconnect any previous active client BEFORE creating a new one
+        // Uses module-level ref to survive HMR cycles
+        if (_activeClient) {
+            _activeClient.disconnect();
+            _activeClient = undefined;
+        }
 
         const c = createClient({
             jid,
@@ -561,14 +710,43 @@ export const AuthProvider: ParentComponent = (props) => {
             autoReconnect: true,
             useStreamManagement: true,
             allowResumption: true,
-            resource: settings().resource,
+            resource: getEffectiveResource(),
         });
 
-        client()?.disconnect();
+        _activeClient = c;
+        manager.bindClient(c);
+
+        if (lifecycleCleanup) lifecycleCleanup();
+        lifecycleCleanup = undefined;
+
         setClient(c);
         setIsConnecting(true);
         setIsBootstrapping(true);
         setHasSession(false);
+
+        const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+            if (hasSession()) {
+                event.preventDefault();
+            }
+        };
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible' && hasSession() && c) {
+                const configuredPresence = settings().presence;
+                c.sendPresence({
+                    show: configuredPresence.show === 'online' ? undefined : configuredPresence.show,
+                    status: configuredPresence.status || undefined,
+                });
+            }
+        };
+
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        lifecycleCleanup = () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
 
         c.on('connected', () => {
             setIsConnecting(false);
@@ -589,24 +767,28 @@ export const AuthProvider: ParentComponent = (props) => {
         c.on('session:started', async () => {
             setHasSession(true);
 
+            // 1. Enable carbons for message synchronization across devices
             try {
                 await c.enableCarbons();
             } catch (e) {
                 console.error('Failed to enable carbons', e);
             }
 
+            // 2. Load roster (contact list)
             try {
                 const roster = await c.getRoster();
                 for (const item of roster?.items || []) {
                     const contactJid = toBareJid((item as any).jid);
                     if (!contactJid) continue;
+                    const subscription = (item as any).subscription as string | undefined;
                     patchContact(contactJid, {
                         jid: contactJid,
                         name: (item as any).name,
-                        subscription: (item as any).subscription,
+                        subscription,
+                        pendingSubscription: subscription === 'from',
                     });
 
-                    if ((item as any).subscription && (item as any).subscription !== 'none') {
+                    if (subscription && subscription !== 'none') {
                         c.sendPresence({
                             to: contactJid,
                             type: 'probe',
@@ -617,17 +799,76 @@ export const AuthProvider: ParentComponent = (props) => {
                 console.error('Failed to load roster', e);
             }
 
+            // 3. Initialize OMEMO identity BEFORE updating caps
+            const manager = omemoManager();
+            if (manager) {
+                try {
+                    await manager.initialize();
+                } catch (e) {
+                    console.error('Failed to initialize OMEMO identity', e);
+                }
+            }
+
+            // 3.5 Register OMEMO and EME features in Entity Capabilities before broadcasting presence
+            try {
+                c.disco.addFeature(NS_OMEMO_AXOLOTL);
+                c.disco.addFeature(NS_OMEMO_DEVICELIST);
+                c.disco.addFeature(pepNotify(NS_OMEMO_DEVICELIST));
+                c.disco.addFeature(pepNotify(NS_OMEMO_BUNDLES));
+                c.disco.addFeature('urn:xmpp:eme:0');
+            } catch (e) {
+                // Feature registration is best-effort
+            }
+
+            // 4. Update client capabilities (now includes OMEMO features if available)
             c.updateCaps();
+
+            // 5. Send initial presence (broadcasts capabilities hash)
             const configuredPresence = settings().presence;
             c.sendPresence({
                 show: configuredPresence.show === 'online' ? undefined : configuredPresence.show,
                 status: configuredPresence.status || undefined,
             });
-            await detectOmemoSupport(c, jid);
-            await refreshOmemoDeviceList();
-            await loadRecentConversations(c);
+
+            // 6. Publish OMEMO keys and subscribe to PEP push updates
+            if (manager) {
+                setOmemoAvailable(true);
+
+                try {
+                    const devices = await manager.ensurePublished();
+                    setOmemoDeviceIds(devices);
+                    c.updateCaps();
+                    c.sendPresence({
+                        show: configuredPresence.show === 'online' ? undefined : configuredPresence.show,
+                        status: configuredPresence.status || undefined,
+                    });
+                } catch (e) {
+                    console.error('OMEMO publish failed (keys still available locally)', e);
+                    await refreshOmemoDeviceList();
+                }
+
+                // Subscribe to our own OMEMO devicelist PEP for push updates (best-effort)
+                try {
+                    await c.subscribeToNode(toBareJid(jid), {
+                        node: NS_OMEMO_DEVICELIST,
+                    });
+                } catch (e) {
+                    // Subscription may fail; PEP push still works from presence subscription
+                }
+            }
+
+            // 7. Load MAM history
+            setIsSyncing(true);
+            try {
+                await loadRecentConversations(c);
+            } finally {
+                setIsSyncing(false);
+            }
+
+            // 8. Load own profile
             await loadOwnProfile(c, jid);
 
+            // 9. Update our own contact in local store
             patchContact(toBareJid(jid), {
                 jid: toBareJid(jid),
                 presence: normalizePresence(configuredPresence.show),
@@ -659,18 +900,37 @@ export const AuthProvider: ParentComponent = (props) => {
             for (const item of items) {
                 const contactJid = toBareJid((item as any).jid);
                 if (!contactJid) continue;
+                const subscription = (item as any).subscription as string | undefined;
                 patchContact(contactJid, {
                     jid: contactJid,
                     name: (item as any).name,
-                    subscription: (item as any).subscription,
+                    subscription,
+                    pendingSubscription: subscription === 'from',
                 });
             }
+        });
+
+        c.on('subscribe', (presence: any) => {
+            const fromBare = toBareJid(presence?.from);
+            if (!fromBare) return;
+            patchContact(fromBare, {
+                jid: fromBare,
+                pendingSubscription: true,
+            });
         });
 
         c.on('presence', (presence: any) => {
             const fromFull = presence?.from as string | undefined;
             const fromBare = toBareJid(fromFull);
             if (!fromBare) return;
+
+            if (presence?.type === 'subscribe') {
+                patchContact(fromBare, {
+                    jid: fromBare,
+                    pendingSubscription: true,
+                });
+                return;
+            }
 
             const resource = toResource(fromFull);
 
@@ -721,25 +981,53 @@ export const AuthProvider: ParentComponent = (props) => {
         });
 
         c.on('chat', (msg: any) => {
-            recordMessage(msg, false, 'incoming');
+            void processIncomingMessage(msg, false);
         });
 
         c.on('mam:item', (msg: any) => {
-            recordMessage(msg, true, 'incoming');
+            void processIncomingMessage(msg, true);
         });
 
         c.on('carbon:received', (payload: any) => {
             const forwarded = payload?.carbonReceived?.forwarded?.message || payload?.forwarded?.message;
-            if (forwarded) recordMessage(forwarded, false, 'incoming');
+            if (forwarded) void processIncomingMessage(forwarded, false);
         });
 
         c.on('carbon:sent', (payload: any) => {
             const forwarded = payload?.carbonSent?.forwarded?.message || payload?.forwarded?.message;
-            if (forwarded) recordMessage(forwarded, false, 'outgoing');
+            if (!forwarded) return;
+            if (forwarded.omemo) {
+                void processIncomingMessage(forwarded, false, 'outgoing');
+                return;
+            }
+            recordMessage(forwarded, false, 'outgoing');
         });
 
         c.on('message:sent', (msg: any) => {
+            if (msg?.omemo) return; // already recorded manually with plaintext body
             recordMessage(msg, false, 'outgoing');
+        });
+
+        // Listen for PEP updates (OMEMO device list changes, etc.)
+        c.on('pubsub:published', (event: any) => {
+            const node = event?.pubsub?.node || event?.pubsub?.items?.node;
+            if (node !== NS_OMEMO_DEVICELIST || !event?.pubsub?.items?.published) return;
+
+            const fromJid = toBareJid(event.jid || event.from);
+            const selfJid = toBareJid(creds()?.jid);
+            if (fromJid === selfJid) {
+                void refreshOmemoDeviceList();
+                return;
+            }
+
+            const manager = omemoManager();
+            if (manager && fromJid) {
+                void manager.ensureContactKeyStore(fromJid, true).then((keystore) => {
+                    for (const bundle of keystore.bundles) {
+                        trustStore()?.recordKey(fromJid, bundle.deviceId, bundle.identityKey);
+                    }
+                });
+            }
         });
 
         c.connect();
@@ -773,7 +1061,11 @@ export const AuthProvider: ParentComponent = (props) => {
 
     const logout = () => {
         const accountJid = creds()?.jid;
-        client()?.disconnect();
+        if (lifecycleCleanup) lifecycleCleanup();
+        if (_activeClient) {
+            _activeClient.disconnect();
+            _activeClient = undefined;
+        }
         setClient(undefined);
         setCredentials(undefined);
         setContactsByJid(reconcile({}));
@@ -784,6 +1076,8 @@ export const AuthProvider: ParentComponent = (props) => {
         setIsConnecting(false);
         setIsBootstrapping(false);
         setOmemoDeviceIds([]);
+        setOmemoManager(undefined);
+        setTrustStore(undefined);
         setPersistedReadState({});
         localStorage.removeItem(messagesKeyFor(accountJid));
     };
@@ -810,13 +1104,18 @@ export const AuthProvider: ParentComponent = (props) => {
         const c = client();
         if (!c || !hasSession() || !conversationJid) return;
 
-        const result = await c.searchHistory({
-            with: conversationJid,
-            paging: { max },
-        } as any) as HistorySearchResult;
+        setIsSyncing(true);
+        try {
+            const result = await c.searchHistory({
+                with: conversationJid,
+                paging: { max },
+            } as any) as HistorySearchResult;
 
-        applyMAMResults(result.results);
-        applyMAMPaging(conversationJid, result, 'latest');
+            await applyMAMResults(result.results);
+            applyMAMPaging(conversationJid, result, 'latest');
+        } finally {
+            setIsSyncing(false);
+        }
     };
 
     const loadOlderMessages = async (conversationJid: string, max = 30) => {
@@ -824,31 +1123,218 @@ export const AuthProvider: ParentComponent = (props) => {
         const before = conversationMeta[conversationJid]?.mamBefore;
         if (!c || !hasSession() || !conversationJid || !before) return;
 
-        const result = await c.searchHistory({
-            with: conversationJid,
-            paging: { max, before },
-        } as any) as HistorySearchResult;
+        setIsSyncing(true);
+        try {
+            const result = await c.searchHistory({
+                with: conversationJid,
+                paging: { max, before },
+            } as any) as HistorySearchResult;
 
-        applyMAMResults(result.results);
-        applyMAMPaging(conversationJid, result, 'older');
+            await applyMAMResults(result.results);
+            applyMAMPaging(conversationJid, result, 'older');
+        } finally {
+            setIsSyncing(false);
+        }
     };
 
-    const sendChat = (to: string, body: string) => {
+    const sendChat = async (to: string, body: string) => {
         const c = client();
         const trimmedBody = body.trim();
         if (!c || !trimmedBody) return undefined;
 
+        const contactJid = toBareJid(to);
+        const selfJid = toBareJid(creds()?.jid);
+        const chatEncryption = trustStore()?.getChatEncryption(contactJid);
+        const wantsOmemo = chatEncryption?.enabled && chatEncryption?.mechanism === 'omemo' && omemoAvailable();
+        const manager = omemoManager();
+
+        if (wantsOmemo && manager) {
+            const encrypted = await manager.encryptMessage(contactJid, trimmedBody);
+            if (encrypted) {
+                const id = c.sendMessage({
+                    to,
+                    type: 'chat',
+                    body: '[OMEMO encrypted message]',
+                    omemo: {
+                        header: {
+                            iv: new Uint8Array(encrypted.iv),
+                            sid: encrypted.sid,
+                            keys: encrypted.keys.map((k) => ({
+                                rid: k.rid,
+                                preKey: k.prekey,
+                                value: new Uint8Array(k.value),
+                            })),
+                        },
+                        payload: new Uint8Array(encrypted.payload),
+                    },
+                    encryptionMethod: { id: NS_OMEMO_AXOLOTL, name: 'OMEMO' },
+                    processingHints: { store: true },
+                } as any);
+
+                recordMessage(
+                    { from: selfJid, to: contactJid, id, omemo: true },
+                    false,
+                    'outgoing',
+                    trimmedBody
+                );
+
+                return id;
+            }
+            // encryption failed — for user-facing chats, send an error message instead of falling back
+            recordMessage(
+                { from: selfJid, to: contactJid, id: '', omemo: true },
+                false,
+                'outgoing',
+                trustStore()?.isContactTrusted(contactJid)
+                    ? '[OMEMO — could not encrypt: no device keys available for ' + contactJid + ']'
+                    : '[OMEMO — could not encrypt: trust at least one contact device for ' + contactJid + ']'
+            );
+            return undefined;
+        }
+
+        // Plaintext fallback when OMEMO not requested
         const id = c.sendMessage({
             to,
             type: 'chat',
             body: trimmedBody,
-            encryptionMethod: omemoEnabled() && omemoAvailable()
-                ? { id: NS_OMEMO_AXOLOTL, name: 'OMEMO' }
-                : undefined,
         } as any);
 
         return id;
     };
+
+    const getKnownContactDevices = (jid: string): number[] => {
+        contactDeviceVersion();
+        const store = trustStore();
+        const manager = omemoManager();
+        const trustIds = store?.getContactDeviceIds(jid) || [];
+        if (!manager) return trustIds;
+
+        if (store) {
+            const bare = toBareJid(jid);
+            const contactState = store.trustByContact[bare];
+            if (contactState) {
+                for (const deviceId of Object.keys(contactState.devices)) {
+                    void contactState.devices[Number(deviceId)]?.fingerprint;
+                }
+            }
+        }
+
+        return manager.getKnownDevices(jid, trustIds);
+    };
+
+    const bumpContactDevices = () => setContactDeviceVersion((value) => value + 1);
+
+    const refreshContactDevices = async (jid: string): Promise<number[]> => {
+        const manager = omemoManager();
+        if (!manager) return getKnownContactDevices(jid);
+
+        const keystore = await manager.ensureContactKeyStore(jid, true);
+        for (const bundle of keystore.bundles) {
+            recordKey(jid, bundle.deviceId, bundle.identityKey);
+        }
+        bumpContactDevices();
+        return keystore.devices;
+    };
+
+    const fetchContactDevices = async (jid: string): Promise<number[]> => {
+        const manager = omemoManager();
+        if (!manager) return getKnownContactDevices(jid);
+
+        const keystore = await manager.ensureContactKeyStore(jid, false);
+        for (const bundle of keystore.bundles) {
+            recordKey(jid, bundle.deviceId, bundle.identityKey);
+        }
+        bumpContactDevices();
+        return keystore.devices.length > 0 ? keystore.devices : getKnownContactDevices(jid);
+    };
+
+    const getChatEncryption = (jid: string) => {
+        return trustStore()?.getChatEncryption(jid) || { mechanism: 'none' as EncryptionMechanism, enabled: false };
+    };
+
+    const setChatEncryption = (jid: string, mode: { mechanism: EncryptionMechanism; enabled: boolean }) => {
+        trustStore()?.setChatEncryption(jid, mode);
+    };
+
+    const setChatEncryptionEnabled = (jid: string, enabled: boolean) => {
+        trustStore()?.setChatEncryptionEnabled(jid, enabled);
+    };
+
+    const setChatEncryptionMechanism = (jid: string, mechanism: EncryptionMechanism) => {
+        trustStore()?.setChatEncryptionMechanism(jid, mechanism);
+    };
+
+    const getDeviceTrust = (jid: string, deviceId: number): TrustLevel => {
+        return trustStore()?.getDeviceTrust(jid, deviceId) || 'untrusted';
+    };
+
+    const setDeviceTrust = (jid: string, deviceId: number, level: TrustLevel) => {
+        trustStore()?.setDeviceTrust(jid, deviceId, level);
+    };
+
+    const isContactTrusted = (jid: string): boolean => {
+        return trustStore()?.isContactTrusted(jid) || false;
+    };
+
+    const recordKey = (jid: string, deviceId: number, publicKey: ArrayBuffer) => {
+        const store = trustStore();
+        if (!store) return;
+
+        const bare = toBareJid(jid);
+        const selfJid = toBareJid(creds()?.jid);
+        store.recordKey(bare, deviceId, publicKey);
+
+        if (selfJid && bare === selfJid) {
+            store.setDeviceTrust(bare, deviceId, 'trusted');
+        }
+    };
+
+    const acceptSubscription = (jid: string) => {
+        const c = client();
+        const bare = toBareJid(jid);
+        if (!c || !bare) return;
+
+        c.acceptSubscription(bare);
+        c.subscribe(bare);
+        patchContact(bare, {
+            subscription: 'both',
+            pendingSubscription: false,
+        });
+    };
+
+    const denySubscription = (jid: string) => {
+        const c = client();
+        const bare = toBareJid(jid);
+        if (!c || !bare) return;
+
+        c.denySubscription(bare);
+        patchContact(bare, {
+            pendingSubscription: false,
+        });
+    };
+
+    const addContact = (jid: string) => {
+        const c = client();
+        const bare = toBareJid(jid);
+        if (!c || !bare) return;
+
+        c.subscribe(bare);
+        patchContact(bare, {
+            jid: bare,
+            subscription: 'to',
+            pendingSubscription: false,
+        });
+    };
+
+    const cycleDeviceTrust = (jid: string, deviceId: number) => {
+        trustStore()?.cycleDeviceTrust(jid, deviceId);
+    };
+
+    const pendingSubscriptions = createMemo(() => {
+        return Object.values(contactsByJid).filter(
+            (contact) => contact.pendingSubscription || contact.subscription === 'from'
+        );
+    });
 
     const setResource = (resource: string) => {
         const nextResource = resource.trim();
@@ -888,7 +1374,7 @@ export const AuthProvider: ParentComponent = (props) => {
 
     createEffect((previousKey) => {
         const c = creds();
-        const currentKey = c ? `${c.jid}|${settings().resource}` : '';
+        const currentKey = c ? `${c.jid}|${getEffectiveResource()}` : '';
 
         if (!c) {
             setIsBootstrapping(false);
@@ -977,10 +1463,26 @@ export const AuthProvider: ParentComponent = (props) => {
         return Boolean(conversationMeta[conversationJid]?.hasOlder);
     };
 
+    const contactTrust = createMemo<ContactTrustSummary[]>(() => {
+        const store = trustStore();
+        if (!store) return [];
+
+        for (const [jid, contactState] of Object.entries(store.trustByContact)) {
+            void jid;
+            for (const deviceId of Object.keys(contactState.devices)) {
+                void deviceId;
+                void contactState.devices[Number(deviceId)]?.level;
+            }
+        }
+
+        return store.listContactTrust();
+    });
+
     const value: AuthContextType = {
         isAuthed,
         isConnecting,
         isBootstrapping,
+        isSyncing,
         jid: () => creds()?.jid,
         resource: () => settings().resource,
         profile,
@@ -997,15 +1499,68 @@ export const AuthProvider: ParentComponent = (props) => {
         markConversationRead,
         sendChat,
         setPresence,
+        pendingSubscriptions,
+        acceptSubscription,
+        denySubscription,
+        addContact,
         omemo: {
+            manager: omemoManager,
             canUse: omemoAvailable,
             setEnabled: (enabled) => setOmemoEnabled(enabled),
             isEnabled: omemoEnabled,
             deviceIds: omemoDeviceIds,
             refreshDeviceList: refreshOmemoDeviceList,
             publishDeviceList: publishOmemoDeviceList,
+            republish: republishOmemo,
+            regenerateIdentity: async () => {
+                const m = omemoManager();
+                if (!m) return;
+                m.clear();
+                await m.initialize();
+                setOmemoDeviceIds([]);
+                try {
+                    const devices = await m.ensurePublished();
+                    setOmemoDeviceIds(devices);
+                } catch {
+                    await refreshOmemoDeviceList();
+                }
+            },
+        },
+        encryption: {
+            getChatEncryption,
+            setChatEncryption,
+            setChatEncryptionEnabled,
+            setChatEncryptionMechanism,
+            getDeviceTrust,
+            setDeviceTrust,
+            cycleDeviceTrust,
+            isContactTrusted,
+            contactTrust,
+            getKnownContactDevices,
+            refreshContactDevices,
+            fetchContactDevices,
+            recordKey,
         },
     };
+
+    if (import.meta.env.DEV) {
+        createEffect(() => {
+            const c = client();
+            const manager = omemoManager();
+            if (!c || !manager) return;
+
+            (window as any).__vcXmppDebug = {
+                client: c,
+                omemo: manager,
+                republish: () => republishOmemo(),
+                deviceId: () => manager.getDeviceId(),
+                fetchOwnDeviceList: () => c.getItems('', NS_OMEMO_DEVICELIST, { max: 1 }),
+                fetchOwnBundle: (deviceId: number) =>
+                    c.getItems('', `${NS_OMEMO_BUNDLES}:${deviceId}`, { max: 1 }),
+                sendTest: (to: string, body: string) => sendChat(to, body),
+            };
+        });
+    }
 
     return (
         <AuthContext.Provider value={value}>

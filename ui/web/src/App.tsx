@@ -8,6 +8,7 @@ import { ServerOverviewRoute } from './routes/server';
 import { ServerChannelRoute } from './routes/server/channel';
 import { MessagesRoute } from './routes/messages';
 import { AdminRoute } from './routes/admin';
+import { InviteRoute } from './routes/invite';
 import { BsArrowRepeat } from 'solid-icons/bs';
 
 const Home = () => {
@@ -76,8 +77,12 @@ export const App: Component = () => {
   const { active } = useAccounts();
 
   return (
-    <Show when={active()} fallback={<Route path="*" component={Login} />}>
-      <AccountApp />
-    </Show>
+    <>
+      {/* An invitee has no account yet, so this route sits outside the signed-in shell. */}
+      <Route path="/invite/:token" component={InviteRoute} />
+      <Show when={active()} fallback={<Route path="*" component={Login} />}>
+        <AccountApp />
+      </Show>
+    </>
   )
 };

@@ -1,9 +1,10 @@
-import { Component, createSignal, Show } from "solid-js";
-import { Outcome, describe } from "../components/command-outcome";
+import { Component, createMemo, createSignal, Show } from "solid-js";
+import { Outcome } from "../components/command-outcome";
 import { JID } from "stanza";
 import { useAuth } from "../auth/provider";
 import { useGuilds } from "../guilds/provider";
 import { guildCommand, instanceCommand, runCommand, type CommandOutcome } from "../xmpp/commands";
+import { inviteLink, inviteUri, parseInviteUri } from "../xmpp/invite";
 
 /** Instance administration: invites, accounts, guilds. The daemon refuses non-admins. */
 export const AdminRoute: Component = () => {
@@ -12,6 +13,10 @@ export const AdminRoute: Component = () => {
     const component = () => `vc.${JID.getDomain(jid() ?? '')}`;
 
     const [invite, setInvite] = createSignal<CommandOutcome>();
+    const createdInvite = createMemo(() => {
+        const outcome = invite();
+        return outcome?.ok ? parseInviteUri(outcome.note) : undefined;
+    });
     const [account, setAccount] = createSignal<CommandOutcome>();
     const [guild, setGuild] = createSignal<CommandOutcome>();
     const [username, setUsername] = createSignal('');
@@ -38,13 +43,20 @@ export const AdminRoute: Component = () => {
 
             <section class="card space-y-3">
                 <h2 class="font-semibold">Invite someone</h2>
-                <p class="text-sm text-neutral-400">Creates a one-time account invite. Send the link; it opens in Conversations, Monal, Dino, or any client with XEP-0401.</p>
+                <p class="text-sm text-neutral-400">Creates a one-time account invite. Send the link and the invite page creates the account. The URI beneath it is the same invite, for an XMPP client that takes one.</p>
                 <button class="button button-primary" onClick={() => void run(instanceCommand('invite'), []).then(setInvite)}>New invite link</button>
-                <Show when={invite()}>
-                    {(outcome) => (
-                        <Show when={outcome().ok} fallback={<Outcome outcome={outcome()} />}>
-                            <input class="input w-full font-mono text-xs" readonly value={describe(outcome())} onFocus={(e) => e.currentTarget.select()} />
-                        </Show>
+                <Show when={createdInvite()} fallback={<Outcome outcome={invite()} />}>
+                    {(created) => (
+                        <div class="space-y-3">
+                            <div class="space-y-1">
+                                <label class="text-sm text-neutral-300" for="invite-link">Invite link</label>
+                                <input id="invite-link" class="input w-full font-mono text-xs" readonly value={inviteLink(created())} onFocus={(e) => e.currentTarget.select()} />
+                            </div>
+                            <div class="space-y-1">
+                                <label class="text-sm text-neutral-300" for="invite-uri">XMPP URI</label>
+                                <input id="invite-uri" class="input w-full font-mono text-xs" readonly value={inviteUri(created())} onFocus={(e) => e.currentTarget.select()} />
+                            </div>
+                        </div>
                     )}
                 </Show>
             </section>

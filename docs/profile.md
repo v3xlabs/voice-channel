@@ -45,6 +45,7 @@ not remove the password.
 | 0030 Service Discovery | Everything below is discovered with it. |
 | 0045 Multi-User Chat | Every channel is a room. |
 | 0060 Publish-Subscribe | Guild manifests. |
+| 0077 In-Band Registration | Accepting an invite creates the account. |
 | 0114 External Components | How `vcd` attaches. |
 | 0115 Entity Capabilities | Clients advertise call support. |
 | 0163 Personal Eventing | OMEMO device lists and bundles. |
@@ -54,7 +55,8 @@ not remove the password.
 | 0313 Message Archive Management | Channel history. Enabled on every room. |
 | 0352 Client State Indication | Mobile clients. |
 | 0363 HTTP File Upload | Attachments. |
-| 0401 Ad-hoc Account Invitation | Invite links. Conversations opens them directly. |
+| 0379 Pre-Authenticated Roster Subscription | The `preauth` token that a registration carries. |
+| 0401 Ad-hoc Account Invitation | Invite links. |
 | 0402 PEP Native Bookmarks | Joined rooms follow the account across clients. |
 | 0410 MUC Self-Ping | Clients detect a silent drop from a room. |
 | 0421 Anonymous unique occupant identifiers | Stable identity for occupants. |
@@ -163,7 +165,7 @@ closed by default: accounts come from an admin's invite or an admin-created acco
 
 | Node | Who | Effect |
 | --- | --- | --- |
-| `urn:voice.channel:instance#invite` | instance admin | A XEP-0401 account invite link, obtained from Prosody. |
+| `urn:voice.channel:instance#invite` | instance admin | A XEP-0401 account invite URI, obtained from Prosody. |
 | `urn:voice.channel:instance#account` | instance admin | An account with a chosen password, created through Prosody. |
 | `urn:voice.channel:guild#create` | instance admin | New manifest node and rooms. The caller becomes `owner`. |
 | `urn:voice.channel:guild#join` | anyone | Membership of a public guild. |
@@ -171,6 +173,20 @@ closed by default: accounts come from an admin's invite or an admin-created acco
 | `urn:voice.channel:guild#channels` | `admin` or `owner` | Add, remove, rename, reorder channels. |
 | `urn:voice.channel:guild#members` | `admin` or `owner` | Grant or revoke affiliations for the guild. |
 | `urn:voice.channel:guild#delete` | `owner` | Destroys the rooms and the node. |
+
+An invite is one token, carried two ways:
+
+```
+xmpp:<domain>?register;preauth=<token>
+https://<domain>/invite/<token>
+```
+
+`instance#invite` returns the URI, which any client with XEP-0401 opens. The link is the
+same token on the instance's own web client, for a recipient whose client does not handle
+the scheme; Prosody builds it as well, from `invites_page`. Accepting an invite is
+XEP-0077 registration on an unauthenticated stream: an IQ carrying
+`<preauth xmlns='urn:xmpp:pars:0' token='...'/>`, then a `jabber:iq:register` set with a
+username and a password. The first registration that succeeds spends the token.
 
 ### 3.4 Roles
 

@@ -45,6 +45,8 @@ modules_enabled = {
 modules_disabled = { "s2s" }
 
 allow_registration = false
+-- `just web` serves the client here; mod_invites_register still gates registration on a token.
+invites_page = "http://localhost:5173/invite/{invite.token}"
 c2s_require_encryption = false
 s2s_require_encryption = false
 authentication = "internal_hashed"

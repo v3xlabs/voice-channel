@@ -103,9 +103,16 @@ sudo -u prosody prosodyctl adduser luc@voice.channel
 ```
 
 Sign into the web client with that account. Because the JID is in `admins`, the settings
-menu shows the admin page, which creates guilds, account invites, and accounts. Invite
-links open in any XMPP client that supports XEP-0401, such as Conversations, Monal, or
-Dino, and produce an account that then works in the web client too.
+menu shows the admin page, which creates guilds, account invites, and accounts.
+
+Every invite is one token in two forms. `https://<domain>/invite/<token>` is a page of the
+web client: the recipient picks a username and a password there, and lands signed in.
+`xmpp:<domain>?register;preauth=<token>` is the same invite for any XMPP client that
+supports XEP-0401. Either produces an account that works everywhere. The token is spent by
+the first account it creates.
+
+`prosodyctl shell invite create_account <domain>` makes one from the host, and prints the
+web link because the module sets Prosody's `invites_page` to it.
 
 ## Ports
 

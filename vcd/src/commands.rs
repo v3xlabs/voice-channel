@@ -267,9 +267,9 @@ async fn execute(
             if !is_admin {
                 return Err(forbidden("instance admins only"));
             }
-            let invite = crate::admin::create_invite(session).await?;
+            let uri = crate::admin::create_invite(session).await?;
             info!(admin = requester, "account invite created");
-            return Ok(invite.landing_page.unwrap_or(invite.uri));
+            return Ok(uri);
         }
         "urn:voice.channel:instance#account" => {
             if !is_admin {

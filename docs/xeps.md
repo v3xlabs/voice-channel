@@ -13,6 +13,7 @@ is the voice.channel app, `both` is both.
 | 0030 | Service Discovery | Final | both | Finding every service in this list by asking, never by hard-coded hostname. |
 | 0045 | Multi-User Chat | Stable | both | Every channel is a room. |
 | 0060 | Publish-Subscribe | Stable | both | Guild manifests live in PubSub nodes. |
+| 0077 | In-Band Registration | Final | both | The invite page creates the account over the same websocket the client logs in on. |
 | 0084 | User Avatar | Stable | both | Profile pictures, published over PEP. |
 | 0085 | Chat State Notifications | Final | client | Typing indicators. |
 | 0114 | Jabber Component Protocol | Stable | server | How `vcd` attaches to Prosody. |
@@ -27,9 +28,10 @@ is the voice.channel app, `both` is both.
 | 0352 | Client State Indication | Stable | both | Tell the server the app is in the background. |
 | 0359 | Unique and Stable Stanza IDs | Stable | server | Server-assigned ids so reactions and replies point at the right message. |
 | 0363 | HTTP File Upload | Stable | both | Attachments. |
+| 0379 | Pre-Authenticated Roster Subscription | Proposed | both | The `preauth` token that makes a closed instance accept one registration. |
 | 0384 | OMEMO Encryption | Experimental | client | End-to-end encrypted text, 1:1 and in rooms. |
 | 0388 | Extensible SASL Profile | Stable | both | The login handshake that FAST and passkey login build on. Later. |
-| 0401 | Ad-hoc Account Invitation Generation | Experimental | server | Invite links that Conversations and others open directly. |
+| 0401 | Ad-hoc Account Invitation Generation | Experimental | both | Invite links. Any XMPP client opens the URI; the web client opens the link. |
 | 0402 | PEP Native Bookmarks | Stable | both | The rooms you joined follow your account. |
 | 0410 | MUC Self-Ping | Stable | client | Detect that the server silently dropped you from a room. |
 | 0421 | Anonymous unique occupant identifiers | Experimental | server | Stable identity for occupants regardless of nickname. |

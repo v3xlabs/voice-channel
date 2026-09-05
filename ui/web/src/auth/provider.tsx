@@ -8,6 +8,7 @@ import { bufferToBase64, getTabId } from '../encryption/storage';
 import { toArrayBuffer } from '../encryption/bundle-codec';
 import { GuildProtocol } from '../xmpp/guild';
 import { VoiceProtocol } from '../xmpp/voice';
+import { websocketFor } from '../xmpp/transport';
 import type { EncryptionMechanism, TrustLevel, ContactTrustSummary } from '../encryption/types';
 
 export type AuthContextType = {
@@ -720,9 +721,7 @@ export const createAccountSession = (initial: PersistedCred, hooks: SessionHooks
             activeClient = undefined;
         }
 
-        const domain = jid.split('@')[1] ?? '';
-        const isLocalDomain = domain === 'localhost' || domain.endsWith('.localhost');
-        const websocket: string | undefined = isLocalDomain ? import.meta.env.VITE_XMPP_WEBSOCKET : undefined;
+        const websocket = websocketFor(jid.split('@')[1] ?? '');
         const c = createClient({
             jid,
             credentials,

@@ -309,6 +309,8 @@ in
         extraConfig = ''
           http_external_url = "https://${domain}/"
           consider_websocket_secure = true
+          -- Matches the web client's invite route; changing one means changing the other.
+          invites_page = "https://${domain}/invite/{invite.token}"
           archive_expires_after = "never"
           ${lib.optionalString turnConfigured ''
             turn_external_secret = "$TURN_SECRET"

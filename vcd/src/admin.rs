@@ -16,11 +16,6 @@ const NODE_CREATE_ACCOUNT_INVITE: &str = "urn:xmpp:invite#create-account";
 const NODE_ADD_USER: &str = "http://jabber.org/protocol/admin#add-user";
 const FORM_ADMIN: &str = "http://jabber.org/protocol/admin";
 
-pub struct Invite {
-    pub uri: String,
-    pub landing_page: Option<String>,
-}
-
 async fn run(session: &Session, node: &str, form: Option<DataForm>) -> Result<Element> {
     let mut command = Element::builder("command", NS_COMMANDS)
         .attr_str("node", node)
@@ -63,8 +58,9 @@ fn field_value(form: &DataForm, var: &str) -> Option<String> {
         .filter(|value| !value.is_empty())
 }
 
-/// A XEP-0401 account invite: the link a new user opens in any XMPP client.
-pub async fn create_invite(session: &Session) -> Result<Invite> {
+/// A XEP-0401 account invite, as `xmpp:<domain>?register;preauth=<token>`. Clients that
+/// handle the scheme open it; the web client turns it into an invite page of its own.
+pub async fn create_invite(session: &Session) -> Result<String> {
     let payload = run(session, NODE_CREATE_ACCOUNT_INVITE, None).await?;
     let form = payload
         .get_child("x", ns::DATA_FORMS)
@@ -72,10 +68,7 @@ pub async fn create_invite(session: &Session) -> Result<Invite> {
         .map(DataForm::try_from)
         .transpose()?
         .ok_or_else(|| anyhow!("invite command returned no form"))?;
-    Ok(Invite {
-        uri: field_value(&form, "uri").ok_or_else(|| anyhow!("invite without uri"))?,
-        landing_page: field_value(&form, "url"),
-    })
+    field_value(&form, "uri").ok_or_else(|| anyhow!("invite without uri"))
 }
 
 /// An account with a chosen password, created directly by the admin.

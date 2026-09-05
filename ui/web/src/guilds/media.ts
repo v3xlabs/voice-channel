@@ -24,6 +24,25 @@ const openStream = async (
         .getUserMedia(constraints)
         .catch(() => navigator.mediaDevices.getUserMedia(fallback));
 
+/** What to tell the person in the call, rather than a DOMException name. */
+export const describeCaptureError = (error: unknown, device: 'microphone' | 'camera' | 'screen'): string => {
+    const name = error instanceof DOMException ? error.name : '';
+    switch (name) {
+        case 'NotAllowedError':
+        case 'SecurityError':
+            return `Permission to use the ${device} was denied.`;
+        case 'NotFoundError':
+        case 'OverconstrainedError':
+            return `No ${device} was found.`;
+        case 'NotReadableError':
+            return `The ${device} is in use by another application.`;
+        case 'AbortError':
+            return `The ${device} stopped unexpectedly.`;
+        default:
+            return `The ${device} could not be started.`;
+    }
+};
+
 /**
  * The instance's STUN and TURN services (XEP-0215) as ICE servers.
  *
@@ -91,6 +110,8 @@ export type MediaState = {
     /** The label of the shared surface, as the browser names it. */
     screenLabel?: string;
     micLabel?: string;
+    /** Why capture is unavailable, when it is. The call carries on without it. */
+    captureError?: string;
 };
 
 const parse = <T,>(value: string | null, fallback: T): T => {
@@ -203,7 +224,16 @@ export const createMediaController = (client: () => Agent | undefined) => {
         if (!c) return;
         conference = conferenceJid;
         c.jingle.iceServers = await discoverIceServers(c);
-        micStream = await openMic();
+        setState('captureError', undefined);
+        try {
+            micStream = await openMic();
+        } catch (error: unknown) {
+            // The conference service opens this participant's connection from their room
+            // presence, so a call without a microphone still hears everyone else.
+            setState('captureError', describeCaptureError(error, 'microphone'));
+            await refreshDevices();
+            return;
+        }
         for (const track of micStream.getAudioTracks()) track.enabled = !muted;
         watchLevel('local', micStream);
         micSession = c.jingle.createMediaSession(conferenceJid, undefined, micStream);
@@ -232,17 +262,24 @@ export const createMediaController = (client: () => Agent | undefined) => {
     const setCamera = async (on: boolean) => {
         const c = client();
         if (!on) {
-            cameraSession?.end('success', true);
+            cameraSession?.end('success');
             cameraSession = undefined;
             for (const track of state.cameraStream?.getTracks() ?? []) track.stop();
             setState('cameraStream', undefined);
             return;
         }
         if (!c || !conference) return;
-        const stream = await openStream(
-            { video: state.chosen.camera ? { deviceId: { exact: state.chosen.camera } } : true },
-            { video: true },
-        );
+        let stream: MediaStream;
+        try {
+            stream = await openStream(
+                { video: state.chosen.camera ? { deviceId: { exact: state.chosen.camera } } : true },
+                { video: true },
+            );
+        } catch (error: unknown) {
+            setState('captureError', describeCaptureError(error, 'camera'));
+            return;
+        }
+        setState('captureError', undefined);
         setState('cameraStream', stream);
         cameraSession = c.jingle.createMediaSession(conference, undefined, stream);
         await cameraSession.start();
@@ -259,23 +296,32 @@ export const createMediaController = (client: () => Agent | undefined) => {
     const setScreen = async (on: boolean) => {
         const c = client();
         if (!on) {
-            screenSession?.end('success', true);
+            screenSession?.end('success');
             screenSession = undefined;
             for (const track of state.screenStream?.getTracks() ?? []) track.stop();
             setState({ screenStream: undefined, screenLabel: undefined });
             return;
         }
         if (!c || !conference) return;
-        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+        let stream: MediaStream;
+        try {
+            stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+        } catch (error: unknown) {
+            // Dismissing the picker raises NotAllowedError, which is not worth reporting.
+            if (!(error instanceof DOMException) || error.name !== 'NotAllowedError') {
+                setState('captureError', describeCaptureError(error, 'screen'));
+            }
+            return;
+        }
         const track = stream.getVideoTracks()[0];
-        setState({ screenStream: stream, screenLabel: track?.label });
+        setState({ captureError: undefined, screenStream: stream, screenLabel: track?.label });
         track?.addEventListener('ended', () => void setScreen(false));
         screenSession = c.jingle.createMediaSession(conference, `${SCREEN_SID_PREFIX}${crypto.randomUUID()}`, stream);
         await screenSession.start();
     };
 
     const stop = () => {
-        for (const session of [micSession, cameraSession, screenSession]) session?.end('success', true);
+        for (const session of [micSession, cameraSession, screenSession]) session?.end('success');
         micSession = cameraSession = screenSession = undefined;
         for (const stream of [micStream, state.cameraStream, state.screenStream]) {
             for (const track of stream?.getTracks() ?? []) track.stop();
@@ -284,8 +330,8 @@ export const createMediaController = (client: () => Agent | undefined) => {
         conference = undefined;
         for (const key of [...analysers.keys()]) unwatchLevel(key);
         const c = client();
-        for (const remote of Object.values(state.remote)) c?.jingle.sessions[remote.sid]?.end('success', true);
-        setState({ cameraStream: undefined, screenStream: undefined, screenLabel: undefined, micLabel: undefined, localLevel: 0 });
+        for (const remote of Object.values(state.remote)) c?.jingle.sessions[remote.sid]?.end('success');
+        setState({ cameraStream: undefined, screenStream: undefined, screenLabel: undefined, micLabel: undefined, localLevel: 0, captureError: undefined });
         setState('remote', reconcile({}));
         setState('remoteLevels', reconcile({}));
     };

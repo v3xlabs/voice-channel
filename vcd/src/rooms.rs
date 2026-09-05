@@ -189,23 +189,29 @@ pub async fn track_presence(session: &Arc<Session>, presence: &Presence) {
     if nick == "vcd" {
         return;
     }
-    let real = presence
+    // Several devices of one account share a nick, and the room then lists one item per device.
+    // Each is a full JID that may publish on its own, so every one of them has to be tracked.
+    let reals: Vec<String> = presence
         .payloads
         .iter()
-        .find(|p| p.is("x", NS_MUC_USER))
-        .and_then(|x| x.get_child("item", NS_MUC_USER))
-        .and_then(|item| item.attr("jid"))
-        .map(|jid| jid.to_string());
+        .filter(|p| p.is("x", NS_MUC_USER))
+        .flat_map(|x| x.children().filter(|c| c.is("item", NS_MUC_USER)))
+        .filter_map(|item| item.attr("jid"))
+        .map(|jid| jid.to_string())
+        .collect();
     let unavailable = presence.type_ == tokio_xmpp::parsers::presence::Type::Unavailable;
     let in_call = presence.payloads.iter().any(|p| p.is("muji", NS_MUJI));
-    tracing::debug!(room, nick, ?real, in_call, unavailable, "room presence");
-    let Some(full) = real else { return };
-    let was_in_call =
-        session
-            .instance
-            .voice
-            .set(&room, &full, if unavailable { None } else { Some(in_call) });
-    if was_in_call && (unavailable || !in_call) {
-        crate::conference::on_left_call(session, &room, &full).await;
+    tracing::debug!(room, nick, ?reals, in_call, unavailable, "room presence");
+    for full in reals {
+        let was_in_call = session.instance.voice.set(
+            &room,
+            &full,
+            if unavailable { None } else { Some(in_call) },
+        );
+        if was_in_call && (unavailable || !in_call) {
+            crate::conference::on_left_call(session, &room, &full).await;
+        } else if !was_in_call && !unavailable && in_call {
+            crate::conference::on_joined_call(session, &room, &full).await;
+        }
     }
 }

@@ -2,7 +2,7 @@
 //! the other. Each stream a participant publishes is one Jingle session from them to us;
 //! every stream we deliver is one Jingle session from us to them, as the ProtoXEP describes.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 
 use anyhow::{Result, anyhow};
@@ -36,24 +36,33 @@ pub struct Conferences {
 #[derive(Default)]
 struct Registry {
     participants: HashMap<String, Arc<Participant>>,
-    /// Candidates from a client that trickled before its `session-initiate` finished opening
-    /// the participant's Galene connection, by full JID and Galene stream id.
+    /// Candidates that arrived before the participant existed at all, by full JID and Galene
+    /// stream id. Handed to the participant once it is registered.
     early: HashMap<String, Vec<(String, Value)>>,
 }
 
 /// A client trickles a handful of candidates per stream. Anything past this is not a client
-/// waiting on its own `session-initiate`.
-const MAX_EARLY_CANDIDATES: usize = 32;
+/// waiting on a stream of its own.
+const MAX_PENDING_CANDIDATES: usize = 32;
 
 struct Participant {
     jid: String,
     conference: String,
     room: String,
     galene: GaleneClient,
-    /// Sessions in which this participant sends media to us, by session id.
-    ups: Mutex<HashMap<String, ()>>,
-    /// Sessions in which we send other participants' streams to them: Galene stream id to session id.
-    downs: Mutex<HashMap<String, String>>,
+    streams: Mutex<Streams>,
+}
+
+/// One lock, because whether a candidate may go out depends on whether Galene has been told
+/// about its stream yet, and the answer must not change between the test and the send.
+#[derive(Default)]
+struct Streams {
+    /// Streams this participant sends us, by session id. Present once Galene has the offer.
+    up: HashSet<String>,
+    /// Streams we send them: Galene stream id to session id.
+    down: HashMap<String, String>,
+    /// Candidates for a stream Galene does not know yet, by Galene stream id.
+    pending: HashMap<String, Vec<Value>>,
 }
 
 impl Participant {
@@ -62,11 +71,36 @@ impl Participant {
     }
 
     fn down_sid(&self, stream_id: &str) -> Option<String> {
-        self.downs
+        self.streams
             .lock()
-            .expect("downs lock")
+            .expect("streams lock")
+            .down
             .get(stream_id)
             .cloned()
+    }
+
+    /// Hand the candidate back when Galene already knows the stream, otherwise hold it: Galene
+    /// discards a candidate for a stream it has not been offered.
+    fn route_candidate(&self, stream: &str, candidate: Value) -> Option<Value> {
+        let mut streams = self.streams.lock().expect("streams lock");
+        if streams.up.contains(stream) || streams.down.contains_key(stream) {
+            return Some(candidate);
+        }
+        let held = streams.pending.entry(stream.to_string()).or_default();
+        if held.len() < MAX_PENDING_CANDIDATES {
+            held.push(candidate);
+        }
+        None
+    }
+
+    /// Galene now has this stream: take the candidates that arrived before its offer did.
+    fn released(&self, stream: &str) -> Vec<Value> {
+        self.streams
+            .lock()
+            .expect("streams lock")
+            .pending
+            .remove(stream)
+            .unwrap_or_default()
     }
 }
 
@@ -142,7 +176,7 @@ pub async fn handle_jingle(
                     "join the room's call first",
                 ));
             }
-            let (participant, early) =
+            let participant =
                 ensure_participant(session, conferences, &from, &conference, &room).await?;
             let sdp = sdp_jingle::jingle_to_sdp(jingle, Role::Initiator)?;
             let label = if sid.starts_with(SCREEN_SID_PREFIX) {
@@ -150,16 +184,15 @@ pub async fn handle_jingle(
             } else {
                 "camera"
             };
-            participant
-                .ups
-                .lock()
-                .expect("ups lock")
-                .insert(sid.clone(), ());
             participant.galene.offer(&sid, label, &sdp).await?;
-            // Galene drops a candidate for a stream it has not been offered yet, so these only
-            // go out now that the offer is through.
-            for (stream, candidate) in early {
-                participant.galene.ice(&stream, candidate).await?;
+            participant
+                .streams
+                .lock()
+                .expect("streams lock")
+                .up
+                .insert(sid.clone());
+            for candidate in participant.released(&sid) {
+                participant.galene.ice(&sid, candidate).await?;
             }
             info!(participant = %from, room, label, "publishing stream");
             Ok(ok(iq))
@@ -177,8 +210,9 @@ pub async fn handle_jingle(
                     continue;
                 };
                 // A client trickles its first candidate within a millisecond of the
-                // session-initiate, well before that initiate has opened its Galene connection.
+                // session-initiate, so the stream it names is routinely not offered yet.
                 if let Some((participant, candidate)) = conferences.route(&from, stream, candidate)
+                    && let Some(candidate) = participant.route_candidate(stream, candidate)
                 {
                     participant.galene.ice(stream, candidate).await?;
                 }
@@ -186,28 +220,21 @@ pub async fn handle_jingle(
             Ok(ok(iq))
         }
         "session-terminate" => {
+            // Ending a stream is not leaving the conference: a participant who publishes nothing
+            // still receives everyone else. Leaving the room's call is what tears them down.
             if let Some(participant) = conferences.get(&from) {
-                let was_up = participant
-                    .ups
-                    .lock()
-                    .expect("ups lock")
-                    .remove(&sid)
-                    .is_some();
+                let was_up = {
+                    let mut streams = participant.streams.lock().expect("streams lock");
+                    streams.pending.remove(&sid);
+                    streams.up.remove(&sid)
+                };
                 if was_up {
                     participant.galene.close(&sid).await?;
                 } else {
-                    let stream_id = stream_id_of(&sid).to_string();
-                    participant
-                        .downs
-                        .lock()
-                        .expect("downs lock")
-                        .remove(&stream_id);
-                }
-                let idle = participant.ups.lock().expect("ups lock").is_empty();
-                if idle {
-                    let _ = participant.galene.leave(&participant.group()).await;
-                    conferences.remove(&from);
-                    info!(participant = %from, "left the conference");
+                    let stream = stream_id_of(&sid).to_string();
+                    let mut streams = participant.streams.lock().expect("streams lock");
+                    streams.down.remove(&stream);
+                    streams.pending.remove(&stream);
                 }
             }
             Ok(ok(iq))
@@ -256,19 +283,24 @@ impl Conferences {
             return Some((participant.clone(), candidate));
         }
         let early = registry.early.entry(jid.to_string()).or_default();
-        if early.len() < MAX_EARLY_CANDIDATES {
+        if early.len() < MAX_PENDING_CANDIDATES {
             early.push((stream.to_string(), candidate));
         }
         None
     }
 
-    /// Register a participant and take the candidates that arrived while it was opening.
-    fn insert(&self, participant: &Arc<Participant>) -> Vec<(String, Value)> {
+    /// Register a participant, moving anything that arrived before it existed into its own
+    /// per-stream hold.
+    fn insert(&self, participant: &Arc<Participant>) {
         let mut registry = self.registry.lock().expect("registry lock");
         registry
             .participants
             .insert(participant.jid.clone(), participant.clone());
-        registry.early.remove(&participant.jid).unwrap_or_default()
+        let early = registry.early.remove(&participant.jid).unwrap_or_default();
+        drop(registry);
+        for (stream, candidate) in early {
+            participant.route_candidate(&stream, candidate);
+        }
     }
 }
 
@@ -278,9 +310,9 @@ async fn ensure_participant(
     jid: &str,
     conference: &str,
     room: &str,
-) -> Result<(Arc<Participant>, Vec<(String, Value)>)> {
+) -> Result<Arc<Participant>> {
     if let Some(existing) = conferences.get(jid) {
-        return Ok((existing, Vec::new()));
+        return Ok(existing);
     }
     let node = conference.split('@').next().unwrap_or(conference);
     let group = format!("vc/{node}");
@@ -299,13 +331,30 @@ async fn ensure_participant(
         conference: conference.to_string(),
         room: room.to_string(),
         galene,
-        ups: Mutex::new(HashMap::new()),
-        downs: Mutex::new(HashMap::new()),
+        streams: Mutex::new(Streams::default()),
     });
-    let early = conferences.insert(&participant);
+    conferences.insert(&participant);
     tokio::spawn(pump_events(session.clone(), participant.clone(), events_rx));
     info!(participant = jid, group, "joined galene");
-    Ok((participant, early))
+    Ok(participant)
+}
+
+/// The room says this person entered the call. Open their conference connection now, so that
+/// they receive everyone else whether or not they ever publish anything themselves: a denied
+/// microphone should cost them their voice, not the whole call.
+pub async fn on_joined_call(session: &Arc<Session>, room: &str, full: &str) {
+    let Some(conference) = session.instance.store.conference_of(room).await else {
+        return;
+    };
+    let conferences = &session.instance.conferences;
+    if let Err(err) = ensure_participant(session, conferences, full, &conference, room).await {
+        warn!(
+            participant = full,
+            room,
+            ?err,
+            "could not join the conference"
+        );
+    }
 }
 
 /// Galene events for one participant become Jingle towards that participant.
@@ -336,9 +385,10 @@ async fn pump_events(
             GaleneEvent::Offer { id, username, sdp } => {
                 let sid = down_session_id(&id, &username);
                 participant
-                    .downs
+                    .streams
                     .lock()
-                    .expect("downs lock")
+                    .expect("streams lock")
+                    .down
                     .insert(id, sid.clone());
                 send_session(
                     &session,
@@ -357,9 +407,10 @@ async fn pump_events(
             }
             GaleneEvent::Close { id } | GaleneEvent::Abort { id } => {
                 let sid = participant
-                    .downs
+                    .streams
                     .lock()
-                    .expect("downs lock")
+                    .expect("streams lock")
+                    .down
                     .remove(&id)
                     .unwrap_or(id);
                 send_terminate(&session, &participant, &sid).await
@@ -378,21 +429,16 @@ async fn pump_events(
 }
 
 async fn terminate_all(session: &Session, participant: &Participant) {
-    let downs: Vec<String> = participant
-        .downs
-        .lock()
-        .expect("downs lock")
-        .values()
-        .cloned()
-        .collect();
-    let ups: Vec<String> = participant
-        .ups
-        .lock()
-        .expect("ups lock")
-        .keys()
-        .cloned()
-        .collect();
-    for sid in downs.into_iter().chain(ups) {
+    let sids: Vec<String> = {
+        let streams = participant.streams.lock().expect("streams lock");
+        streams
+            .down
+            .values()
+            .chain(streams.up.iter())
+            .cloned()
+            .collect()
+    };
+    for sid in sids {
         let _ = send_terminate(session, participant, &sid).await;
     }
 }

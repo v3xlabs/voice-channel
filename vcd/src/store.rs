@@ -124,6 +124,18 @@ impl Store {
         self.data.lock().await.guilds.values().cloned().collect()
     }
 
+    /// The conference service of the voice channel this room serves, if it is one.
+    pub async fn conference_of(&self, room: &str) -> Option<String> {
+        self.data
+            .lock()
+            .await
+            .guilds
+            .values()
+            .flat_map(Guild::channels)
+            .find(|channel| channel.kind == ChannelKind::Voice && channel.jid == room)
+            .and_then(|channel| channel.conference.clone())
+    }
+
     pub async fn put(&self, guild: Guild) -> Result<()> {
         let mut data = self.data.lock().await;
         data.guilds.insert(guild.slug.clone(), guild);

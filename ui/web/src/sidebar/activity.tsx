@@ -7,7 +7,7 @@ import { guildChannels } from "../xmpp/guild";
 /** The bottom-left strip: the current channel, or the call you are in with its quick controls. */
 export const SidebarActivity = () => {
     const params = useParams<{ groupId: string, channelId: string }>();
-    const { call, guilds, leaveCall, setVoiceState } = useGuilds();
+    const { call, guilds, leaveCall, setVoiceState, media } = useGuilds();
     const hasChannelId = createMemo(() => params.channelId !== undefined);
 
     const callPlace = createMemo(() => {
@@ -31,7 +31,12 @@ export const SidebarActivity = () => {
             {(place) => (
                 <div class="w-full bg-emerald-800 translate-y-2 pb-4 p-2 -z-10 rounded-t-md flex items-center justify-between gap-2">
                     <a href={`/server/${place().slug}/${place().channel}`} class="min-w-0">
-                        <p class="text-[11px] text-emerald-200">{call()?.stage === 'ready' ? 'Voice connected' : 'Joining voice'}</p>
+                        <Show
+                            when={media.state.captureError}
+                            fallback={<p class="text-[11px] text-emerald-200">{call()?.stage === 'ready' ? 'Voice connected' : 'Joining voice'}</p>}
+                        >
+                            <p class="text-[11px] text-amber-300">Listening only</p>
+                        </Show>
                         <p class="text-sm text-white truncate">{place().channel}<span class="text-emerald-200"> / {place().guild}</span></p>
                     </a>
                     <div class="flex items-center gap-1 shrink-0">

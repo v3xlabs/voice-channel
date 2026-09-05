@@ -1,6 +1,6 @@
 import { Component, createEffect, createMemo, createSignal, For, Show, type JSX } from "solid-js"
 import { useParams } from "@solidjs/router";
-import { BsCameraVideoFill, BsCameraVideoOffFill, BsChevronUp, BsDisplay, BsHash, BsHeadphones, BsMicFill, BsMicMuteFill, BsTelephoneXFill, BsVolumeMuteFill, BsVolumeUp } from "solid-icons/bs";
+import { BsCameraVideoFill, BsCameraVideoOffFill, BsChevronUp, BsDisplay, BsExclamationTriangleFill, BsHash, BsHeadphones, BsMicFill, BsMicMuteFill, BsTelephoneXFill, BsVolumeMuteFill, BsVolumeUp } from "solid-icons/bs";
 import { useGuilds, type Occupant } from "../../guilds/provider";
 import { isSpeaking } from "../../guilds/media";
 import { VoiceStateIcons } from "../../components/voice-state-icons";
@@ -109,28 +109,38 @@ const CallControls: Component<{ roomJid: string }> = (props) => {
     const { call, media, joinCall, leaveCall, setVoiceState } = useGuilds();
     const inThisCall = () => call()?.roomJid === props.roomJid;
     return (
-        <div class="border-t border-neutral-800 p-3 flex items-center justify-center gap-2">
-            <Show when={inThisCall()} fallback={<button class="button button-primary" onClick={() => joinCall(props.roomJid)}>Join call</button>}>
-                <IconButton title={call()?.voice.muted ? 'Unmute' : 'Mute'} active={call()?.voice.muted} onClick={() => setVoiceState({ muted: !call()?.voice.muted })}>
-                    <Show when={call()?.voice.muted} fallback={<BsMicFill />}><BsMicMuteFill /></Show>
-                </IconButton>
-                <IconButton title={call()?.voice.deafened ? 'Undeafen' : 'Deafen'} active={call()?.voice.deafened} onClick={() => setVoiceState({ deafened: !call()?.voice.deafened })}>
-                    <Show when={call()?.voice.deafened} fallback={<BsHeadphones />}><BsVolumeMuteFill /></Show>
-                </IconButton>
-                <IconButton title={call()?.voice.camera ? 'Camera off' : 'Camera on'} active={!call()?.voice.camera} onClick={() => setVoiceState({ camera: !call()?.voice.camera })}>
-                    <Show when={call()?.voice.camera} fallback={<BsCameraVideoOffFill />}><BsCameraVideoFill /></Show>
-                </IconButton>
-                <IconButton title={call()?.voice.screen ? 'Stop sharing' : 'Share screen'} onClick={() => setVoiceState({ screen: !call()?.voice.screen })}>
-                    <BsDisplay classList={{ 'text-emerald-300': Boolean(call()?.voice.screen) }} />
-                </IconButton>
-                <DeviceMenu />
-                <IconButton title="Leave call" danger onClick={leaveCall}>
-                    <BsTelephoneXFill />
-                </IconButton>
-                <span class="text-xs text-neutral-500 pl-2">
-                    {call()?.stage === 'preparing' ? 'joining' : `${Object.keys(media.state.remote).length} incoming`}
-                </span>
+        <div class="border-t border-neutral-800">
+            <Show when={inThisCall() && media.state.captureError}>
+                {(message) => (
+                    <p class="flex items-center gap-2 px-3 pt-3 text-xs text-amber-300">
+                        <BsExclamationTriangleFill class="shrink-0" />
+                        <span>{message()} You can still hear everyone.</span>
+                    </p>
+                )}
             </Show>
+            <div class="p-3 flex items-center justify-center gap-2">
+                <Show when={inThisCall()} fallback={<button class="button button-primary" onClick={() => joinCall(props.roomJid)}>Join call</button>}>
+                    <IconButton title={call()?.voice.muted ? 'Unmute' : 'Mute'} active={call()?.voice.muted} onClick={() => setVoiceState({ muted: !call()?.voice.muted })}>
+                        <Show when={call()?.voice.muted} fallback={<BsMicFill />}><BsMicMuteFill /></Show>
+                    </IconButton>
+                    <IconButton title={call()?.voice.deafened ? 'Undeafen' : 'Deafen'} active={call()?.voice.deafened} onClick={() => setVoiceState({ deafened: !call()?.voice.deafened })}>
+                        <Show when={call()?.voice.deafened} fallback={<BsHeadphones />}><BsVolumeMuteFill /></Show>
+                    </IconButton>
+                    <IconButton title={call()?.voice.camera ? 'Camera off' : 'Camera on'} active={!call()?.voice.camera} onClick={() => setVoiceState({ camera: !call()?.voice.camera })}>
+                        <Show when={call()?.voice.camera} fallback={<BsCameraVideoOffFill />}><BsCameraVideoFill /></Show>
+                    </IconButton>
+                    <IconButton title={call()?.voice.screen ? 'Stop sharing' : 'Share screen'} onClick={() => setVoiceState({ screen: !call()?.voice.screen })}>
+                        <BsDisplay classList={{ 'text-emerald-300': Boolean(call()?.voice.screen) }} />
+                    </IconButton>
+                    <DeviceMenu />
+                    <IconButton title="Leave call" danger onClick={leaveCall}>
+                        <BsTelephoneXFill />
+                    </IconButton>
+                    <span class="text-xs text-neutral-500 pl-2">
+                        {call()?.stage === 'preparing' ? 'joining' : `${Object.keys(media.state.remote).length} incoming`}
+                    </span>
+                </Show>
+            </div>
         </div>
     );
 };

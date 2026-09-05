@@ -155,7 +155,10 @@ export const createMediaController = (client: () => Agent | undefined) => {
         const c = client();
         if (!c) return;
         conference = conferenceJid;
-        c.jingle.iceServers = await c.discoverICEServers().catch(() => c.jingle.iceServers);
+        // discoverICEServers appends what XEP-0215 returned to jingle.iceServers and resolves
+        // to an empty array, so its result must not be assigned back over them.
+        c.jingle.iceServers = [];
+        await c.discoverICEServers();
         micStream = await openMic();
         for (const track of micStream.getAudioTracks()) track.enabled = !muted;
         watchLevel('local', micStream);

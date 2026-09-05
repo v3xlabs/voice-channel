@@ -3,6 +3,7 @@ import { useParams } from "@solidjs/router";
 import { BsCameraVideoFill, BsCameraVideoOffFill, BsChevronUp, BsDisplay, BsHash, BsHeadphones, BsMicFill, BsMicMuteFill, BsTelephoneXFill, BsVolumeMuteFill, BsVolumeUp } from "solid-icons/bs";
 import { useGuilds, type Occupant } from "../../guilds/provider";
 import { isSpeaking } from "../../guilds/media";
+import { VoiceStateIcons } from "../../components/voice-state-icons";
 import { Avatar } from "../../components/avatar";
 
 const timeLabel = (timestamp: number) =>
@@ -157,15 +158,7 @@ const VoiceChannel: Component<{ roomJid: string }> = (props) => {
                                             <Avatar jid={occupant.jid} name={occupant.nick} size={32} />
                                             <span classList={{ 'text-white': true, 'text-cyan-300': occupant.jid === ownJid() }}>{occupant.nick}</span>
                                             <Level level={occupant.jid === ownJid() ? media.state.localLevel : levelOf(occupant.jid)} />
-                                            <span class="text-xs text-neutral-500">
-                                                {[
-                                                    occupant.call?.preparing ? 'joining' : '',
-                                                    occupant.call?.voice.muted ? 'muted' : '',
-                                                    occupant.call?.voice.deafened ? 'deafened' : '',
-                                                    occupant.call?.voice.camera ? 'camera' : '',
-                                                    occupant.call?.voice.screen ? 'sharing' : '',
-                                                ].filter(Boolean).join(' · ')}
-                                            </span>
+                                            <VoiceStateIcons state={occupant.call?.voice} joining={occupant.call?.preparing} class="ml-auto text-sm" />
                                         </div>
                                         <Show when={occupant.jid === ownJid()}>
                                             <Show when={media.state.cameraStream}>{(stream) => <LocalPreview stream={stream()} />}</Show>

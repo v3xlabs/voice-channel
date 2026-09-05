@@ -8,6 +8,7 @@ import { Jid } from "../components/jid";
 import { Avatar } from "../components/avatar";
 import { useGuilds } from "../guilds/provider";
 import type { GuildChannel } from "../xmpp/guild";
+import { VoiceStateIcons } from "../components/voice-state-icons";
 
 /** Who is in a voice channel's call, shown under the channel like a Discord voice channel. */
 const CallMembers = (props: { roomJid: string }) => {
@@ -15,13 +16,13 @@ const CallMembers = (props: { roomJid: string }) => {
     const members = () => Object.values(room(props.roomJid)?.occupants ?? {}).filter((occupant) => occupant.call);
     return (
         <Show when={members().length > 0}>
-            <ul class="pl-10 pb-1 space-y-0.5">
+            <ul class="pl-[38px] pr-4 py-1 space-y-1">
                 <For each={members()}>
                     {(occupant) => (
-                        <li class="flex items-center gap-2 text-xs text-neutral-400">
-                            <Avatar jid={occupant.jid} name={occupant.nick} size={16} />
+                        <li class="flex items-center gap-2 h-6 text-sm text-neutral-400">
+                            <Avatar jid={occupant.jid} name={occupant.nick} size={18} />
                             <span class="truncate">{occupant.nick}</span>
-                            <Show when={occupant.call?.voice.muted}><span class="text-neutral-600">muted</span></Show>
+                            <VoiceStateIcons state={occupant.call?.voice} joining={occupant.call?.preparing} class="ml-auto text-xs" />
                         </li>
                     )}
                 </For>
@@ -31,6 +32,7 @@ const CallMembers = (props: { roomJid: string }) => {
 };
 
 const ChannelItem = (props: { slug: string, channel: GuildChannel, active: boolean }) => {
+    const { joinCall } = useGuilds();
     return (
         <ContextMenu>
             <ContextMenu.Trigger>
@@ -41,6 +43,7 @@ const ChannelItem = (props: { slug: string, channel: GuildChannel, active: boole
                         'bg-neutral-600 hover:bg-neutral-600': props.active,
                         'hover:bg-neutral-700': !props.active,
                     }}
+                    onDblClick={() => { if (props.channel.kind === 'voice') joinCall(props.channel.jid); }}
                 >
                     <a
                         href={`/server/${props.slug}/${props.channel.name}`}

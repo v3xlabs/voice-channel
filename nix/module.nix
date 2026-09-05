@@ -344,6 +344,25 @@ in
         groupsDir = mkDefault galeneGroups;
         staticDir = mkDefault pkgs.emptyDirectory;
       };
+
+      # The nixpkgs unit writes `-turn ${turnAddress}` unquoted. An empty address
+      # leaves a bare `-turn`, which Go's flag parser satisfies with the following
+      # `-data`, and parsing then stops at the first non-flag word: -groups,
+      # -recordings and -static are dropped and Galene finds no group descriptions.
+      systemd.services.galene.serviceConfig.ExecStart =
+        let
+          galene = config.services.galene;
+        in
+        lib.mkForce (lib.concatStringsSep " " [
+          "${galene.package}/bin/galene"
+          (lib.optionalString galene.insecure "-insecure")
+          "-http=${galene.httpAddress}:${toString galene.httpPort}"
+          "-turn=${galene.turnAddress}"
+          "-data=${galene.dataDir}"
+          "-groups=${galene.groupsDir}"
+          "-recordings=${galene.recordingsDir}"
+          "-static=${galene.staticDir}"
+        ]);
     })
 
     (mkIf cfg.turn.enable {

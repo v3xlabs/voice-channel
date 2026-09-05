@@ -218,8 +218,8 @@ in
           printf 'COMPONENT_SECRET=%s\nTURN_SECRET=%s\n' "$component" "$turn" > /run/voice-channel/prosody.env
           printf 'VCD_SECRET=%s\n' "$component" > /run/voice-channel/vcd.env
           ${lib.optionalString cfg.turn.enable ''
-            printf 'static-auth-secret=%s\n' "$turn" > /run/voice-channel/turn.conf
-            chgrp turnserver /run/voice-channel/turn.conf; chmod 640 /run/voice-channel/turn.conf
+            printf '%s' "$turn" > /run/voice-channel/turn.secret
+            chgrp turnserver /run/voice-channel/turn.secret; chmod 640 /run/voice-channel/turn.secret
           ''}
           ${lib.optionalString cfg.prosody.enable ''
             chgrp prosody /run/voice-channel/prosody.env; chmod 640 /run/voice-channel/prosody.env
@@ -376,6 +376,8 @@ in
         lt-cred-mech = true;
         min-port = cfg.turn.relayPorts.from;
         max-port = cfg.turn.relayPorts.to;
+        # coturn substitutes this into its runtime config, so the secret stays out of the store.
+        static-auth-secret-file = "/run/voice-channel/turn.secret";
         extraConfig = ''
           use-auth-secret
           no-multicast-peers
@@ -383,9 +385,7 @@ in
           ${lib.optionalString (cfg.turn.publicIp != null) "external-ip=${cfg.turn.publicIp}"}
         '';
       };
-      # The secret lives in a runtime file rather than the store-resident config.
       systemd.services.coturn = {
-        serviceConfig.ExecStart = lib.mkForce "${pkgs.coturn}/bin/turnserver -c /run/coturn/turnserver.cfg -c /run/voice-channel/turn.conf";
         after = [ "voice-channel-secrets.service" ];
         requires = [ "voice-channel-secrets.service" ];
       };

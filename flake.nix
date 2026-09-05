@@ -36,7 +36,7 @@
             inherit (finalAttrs) pname version src pnpmInstallFlags;
             pnpm = pkgs.pnpm_11;
             fetcherVersion = 4;
-            hash = "sha256-0waT+Kvwk5CB8+LJcps4EdZZn0EZsHLFJu2D3MOHF1A=";
+            hash = "sha256-7/BIUkYywqCF4foCgFPsYPWmUE4078wYydmgUuC6e1g=";
           };
           # Calling vite directly avoids pnpm re-running install before the script.
           buildPhase = ''

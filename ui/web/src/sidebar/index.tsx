@@ -1,27 +1,18 @@
 import { createMemo, For, ParentComponent, Show } from "solid-js";
-import { ServerGroup } from "./server";
 import { SidebarSettings } from "./settings";
+import { AccountMenu } from "./accounts";
 import { useAuth } from "../auth/provider";
 import { SidebarActivity } from "./activity";
 import { ServerChannels } from "./channels";
 import { BsChatDots } from "solid-icons/bs";
 import { Jid } from "../components/jid";
 import { Avatar } from "../components/avatar";
-
-export type Server = {
-    name: string;
-    url: string;
-    groups: Group[];
-};
-
-export type Group = {
-    groupId: string;
-    name: string;
-    icon?: string;
-}
+import { GuildIcon } from "./group";
+import { useGuilds } from "../guilds/provider";
 
 export const Sidebar = () => {
     const { privateChats, profile, presence, setPresence } = useAuth();
+    const { guilds } = useGuilds();
     const unreadTotal = createMemo(() => {
         return privateChats().reduce((total, chat) => total + chat.unreadCount, 0);
     });
@@ -32,57 +23,6 @@ export const Sidebar = () => {
         const next = presenceOrder[(index + 1) % presenceOrder.length];
         setPresence({ show: next, status: presence().status });
     };
-
-    const servers: Server[] = [
-        {
-            name: 'Voice Channel',
-            url: 'https://voice.channel',
-            groups: [
-                {
-                    groupId: '1',
-                    name: 'V3X Labs',
-                    icon: '🔧',
-                },
-                {
-                    groupId: '2',
-                    name: 'V3X Gaming',
-                    icon: '🎮',
-                },
-                {
-                    groupId: '3',
-                    name: 'V3X Testing',
-                    icon: '🧪',
-                }
-            ]
-        },
-        {
-            name: 'Voice Channel',
-            url: 'https://voice.channel',
-            groups: [
-                {
-                    groupId: '4',
-                    name: 'Jakob\'s Home',
-                    icon: '🇸🇪',
-                },
-                {
-                    groupId: '5',
-                    name: 'Steve\'s Home',
-                    icon: '🏠',
-                }
-            ]
-        },
-        {
-            name: 'Voice Channel',
-            url: 'https://voice.channel',
-            groups: [
-                {
-                    groupId: '6',
-                    name: 'General Lounge Server With Long Name That Doesn\'t End',
-                    icon: '🏠',
-                }
-            ]
-        }
-    ];
 
     return (
         <div class="h-screen flex relative">
@@ -101,9 +41,9 @@ export const Sidebar = () => {
                         </div>
                     </Show>
                 </div>
-                <For each={servers}>
-                    {(server) => (
-                        <ServerGroup server={server} />
+                <For each={guilds()}>
+                    {(guild) => (
+                        <GuildIcon guild={guild} />
                     )}
                 </For>
             </div>
@@ -138,7 +78,10 @@ export const Sidebar = () => {
                                 </div>
                             </Show>
                         </div>
-                        <SidebarSettings />
+                        <div class="flex gap-1">
+                            <AccountMenu />
+                            <SidebarSettings />
+                        </div>
                     </div>
                 </div>
             </div>

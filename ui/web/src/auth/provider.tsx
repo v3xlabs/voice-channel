@@ -1,13 +1,18 @@
-import { Accessor, createContext, createEffect, createMemo, createSignal, onCleanup, useContext, type ParentComponent } from "solid-js";
+import { Accessor, createContext, createEffect, createMemo, createSignal, onCleanup, untrack, useContext, type ParentComponent } from "solid-js";
 import { createStore, reconcile } from "solid-js/store";
 import { Agent, createClient } from 'stanza';
 import type { Credentials } from 'stanza/lib/sasl';
-import { OmemoManager } from '../encryption/omemo';
+import { OmemoManager, toWire } from '../encryption/omemo';
 import { createTrustStore } from '../encryption/trust';
-import { getTabId } from '../encryption/storage';
+import { bufferToBase64, getTabId } from '../encryption/storage';
+import { toArrayBuffer } from '../encryption/bundle-codec';
+import { GuildProtocol } from '../xmpp/guild';
+import { VoiceProtocol } from '../xmpp/voice';
 import type { EncryptionMechanism, TrustLevel, ContactTrustSummary } from '../encryption/types';
 
 export type AuthContextType = {
+    client: Accessor<Agent | undefined>;
+    hasSession: Accessor<boolean>;
     isAuthed: Accessor<boolean>;
     isConnecting: Accessor<boolean>;
     isBootstrapping: Accessor<boolean>;
@@ -17,7 +22,6 @@ export type AuthContextType = {
     profile: Accessor<ContactProfile | undefined>;
     contacts: Accessor<ContactProfile[]>;
     presence: Accessor<PresenceState>;
-    login: (jid: string, password: string) => void;
     logout: () => void;
     setResource: (resource: string) => void;
     privateChats: Accessor<PrivateChatSummary[]>;
@@ -62,14 +66,14 @@ export type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType>();
 
-const VC_CRED_KEY = '@vc/xmpp-credentials';
+export const VC_CRED_KEY = '@vc/xmpp-credentials';
 const VC_SETTINGS_KEY = '@vc/xmpp-settings';
 const VC_READ_STATE_PREFIX = '@vc/xmpp-read-state';
 const VC_MESSAGES_PREFIX = '@vc/xmpp-messages';
 const DEFAULT_RESOURCE = 'voice-channel-web';
 const DEFAULT_PRESENCE: PresenceState = { show: 'online', status: '' };
 
-type PersistedCred = {
+export type PersistedCred = {
     jid: string;
     credentials: Credentials;
 };
@@ -147,9 +151,6 @@ const NS_OMEMO_AXOLOTL = 'eu.siacs.conversations.axolotl';
 const NS_OMEMO_BUNDLES = `${NS_OMEMO_AXOLOTL}.bundles`;
 const pepNotify = (node: string) => `${node}+notify`;
 
-// Module-level client reference that survives HMR cycles
-// Ensures old WebSocket is closed before new one opens
-let _activeClient: Agent | undefined;
 
 const parseJSON = <T,>(value: string | null, fallback: T): T => {
     if (!value) return fallback;
@@ -236,14 +237,24 @@ const toDataUrl = (bytes: unknown, mediaType = 'image/jpeg') => {
     return `data:${mediaType};base64,${btoa(binary)}`;
 };
 
-export const AuthProvider: ParentComponent = (props) => {
+export type SessionHooks = {
+    /** The server rotated or completed the stored credentials; persist them. */
+    onCredentials: (credentials: PersistedCred) => void;
+    /** The user signed this account out; drop it from the account list. */
+    onLogout: () => void;
+};
+
+/**
+ * One connected account. Everything in here is scoped to that account's JID, so the
+ * accounts provider can hold several of these side by side.
+ */
+export const createAccountSession = (initial: PersistedCred, hooks: SessionHooks): AuthContextType => {
     const initialSettings = parseJSON<Partial<XmppSettings>>(localStorage.getItem(VC_SETTINGS_KEY), {});
     const initialStatus = initialSettings.presence?.status === 'Voice Channel online'
         ? ''
         : (initialSettings.presence?.status || DEFAULT_PRESENCE.status);
-    const [creds, setCredentials] = createSignal<PersistedCred | undefined>(
-        sanitizePersistedCred(parseJSON<PersistedCred | undefined>(localStorage.getItem(VC_CRED_KEY), undefined))
-    );
+    const [creds, setCredentials] = createSignal<PersistedCred | undefined>(sanitizePersistedCred(initial));
+    let activeClient: Agent | undefined;
     const [settings, setSettings] = createSignal<XmppSettings>({
         resource: initialSettings.resource || DEFAULT_RESOURCE,
         presence: {
@@ -257,8 +268,7 @@ export const AuthProvider: ParentComponent = (props) => {
 
     createEffect(() => {
         const c = creds();
-        if (c) localStorage.setItem(VC_CRED_KEY, JSON.stringify(c));
-        else localStorage.removeItem(VC_CRED_KEY);
+        if (c) untrack(() => hooks.onCredentials(c));
     });
 
     createEffect(() => {
@@ -287,14 +297,12 @@ export const AuthProvider: ParentComponent = (props) => {
     const [trustStore, setTrustStore] = createSignal<ReturnType<typeof createTrustStore> | undefined>(undefined);
     const [contactDeviceVersion, setContactDeviceVersion] = createSignal(0);
     const seenMessageIds = new Set<string>();
+    const seenOmemoMessages = new Set<string>();
 
-    // Ensure the active XMPP client is disconnected when this component unmounts
-    // (e.g. during HMR reload). Uses the module-level ref so the old client is
-    // always disconnected before a new one connects.
     onCleanup(() => {
-        if (_activeClient) {
-            _activeClient.disconnect();
-            _activeClient = undefined;
+        if (activeClient) {
+            activeClient.disconnect();
+            activeClient = undefined;
         }
     });
 
@@ -505,6 +513,14 @@ export const AuthProvider: ParentComponent = (props) => {
             return;
         }
 
+        // A ratchet message decrypts once. The archive replays live messages, so skip
+        // anything already seen by stanza id or by its unique (sender device, iv) pair.
+        const conversationJid = source === 'outgoing' ? toBareJid(incoming.to) : toBareJid(incoming.from);
+        if (collectIncomingIds(incoming).some((id) => seenMessageIds.has(`${conversationJid}:${id}`))) return;
+        const omemoKey = `${conversationJid}:${omemoPayload.header?.sid}:${bufferToBase64(toArrayBuffer(omemoPayload.header?.iv) ?? new ArrayBuffer(0))}`;
+        if (seenOmemoMessages.has(omemoKey)) return;
+        seenOmemoMessages.add(omemoKey);
+
         const selfDeviceId = manager.getDeviceId();
         const keyEntry = omemoPayload.header?.keys?.find(
             (k: any) => Number(k.rid) === selfDeviceId
@@ -554,11 +570,13 @@ export const AuthProvider: ParentComponent = (props) => {
         }
     };
 
+    // The archive id lives on the result, not on the forwarded message. A live message
+    // carries the same id as its stanza-id, so keeping it here is what makes replays match.
     const extractForwardedMessage = (archiveResult: any) => {
         if (!archiveResult) return undefined;
-        if (archiveResult.item?.message) return archiveResult.item.message;
-        if (archiveResult.forwarded?.message) return archiveResult.forwarded.message;
-        return archiveResult.message;
+        const message = archiveResult.item?.message ?? archiveResult.forwarded?.message ?? archiveResult.message;
+        if (!message) return undefined;
+        return archiveResult.id ? { ...message, archive: { id: archiveResult.id } } : message;
     };
 
     const applyMAMResults = async (results: any[] | undefined) => {
@@ -697,13 +715,14 @@ export const AuthProvider: ParentComponent = (props) => {
             return trustStore()?.shouldEncryptToDevice(contactJid, deviceId, bareJid) ?? true;
         });
 
-        // Disconnect any previous active client BEFORE creating a new one
-        // Uses module-level ref to survive HMR cycles
-        if (_activeClient) {
-            _activeClient.disconnect();
-            _activeClient = undefined;
+        if (activeClient) {
+            activeClient.disconnect();
+            activeClient = undefined;
         }
 
+        const domain = jid.split('@')[1] ?? '';
+        const isLocalDomain = domain === 'localhost' || domain.endsWith('.localhost');
+        const websocket: string | undefined = isLocalDomain ? import.meta.env.VITE_XMPP_WEBSOCKET : undefined;
         const c = createClient({
             jid,
             credentials,
@@ -711,9 +730,12 @@ export const AuthProvider: ParentComponent = (props) => {
             useStreamManagement: true,
             allowResumption: true,
             resource: getEffectiveResource(),
+            ...(websocket ? { transports: { websocket, bosh: false } } : {}),
         });
+        c.stanzas.define(GuildProtocol);
+        c.stanzas.define(VoiceProtocol);
 
-        _activeClient = c;
+        activeClient = c;
         manager.bindClient(c);
 
         if (lifecycleCleanup) lifecycleCleanup();
@@ -723,12 +745,6 @@ export const AuthProvider: ParentComponent = (props) => {
         setIsConnecting(true);
         setIsBootstrapping(true);
         setHasSession(false);
-
-        const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-            if (hasSession()) {
-                event.preventDefault();
-            }
-        };
 
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible' && hasSession() && c) {
@@ -740,11 +756,9 @@ export const AuthProvider: ParentComponent = (props) => {
             }
         };
 
-        window.addEventListener('beforeunload', handleBeforeUnload);
         document.addEventListener('visibilitychange', handleVisibilityChange);
 
         lifecycleCleanup = () => {
-            window.removeEventListener('beforeunload', handleBeforeUnload);
             document.removeEventListener('visibilitychange', handleVisibilityChange);
         };
 
@@ -1035,17 +1049,6 @@ export const AuthProvider: ParentComponent = (props) => {
         return reason;
     };
 
-    const login = (jid: string, password: string) => {
-        const trimmedJid = jid.trim();
-        if (!trimmedJid || !password) return;
-        setCredentials({
-            jid: trimmedJid,
-            credentials: sanitizeCredentials({
-                password,
-            }),
-        });
-    };
-
     const clearMessages = () => {
         for (const key of Object.keys(messagesByConversation)) {
             setMessagesByConversation(key, []);
@@ -1062,9 +1065,9 @@ export const AuthProvider: ParentComponent = (props) => {
     const logout = () => {
         const accountJid = creds()?.jid;
         if (lifecycleCleanup) lifecycleCleanup();
-        if (_activeClient) {
-            _activeClient.disconnect();
-            _activeClient = undefined;
+        if (activeClient) {
+            activeClient.disconnect();
+            activeClient = undefined;
         }
         setClient(undefined);
         setCredentials(undefined);
@@ -1080,6 +1083,7 @@ export const AuthProvider: ParentComponent = (props) => {
         setTrustStore(undefined);
         setPersistedReadState({});
         localStorage.removeItem(messagesKeyFor(accountJid));
+        hooks.onLogout();
     };
 
     const messagesFor = (conversationJid: string) => {
@@ -1157,15 +1161,15 @@ export const AuthProvider: ParentComponent = (props) => {
                     body: '[OMEMO encrypted message]',
                     omemo: {
                         header: {
-                            iv: new Uint8Array(encrypted.iv),
+                            iv: toWire(encrypted.iv),
                             sid: encrypted.sid,
                             keys: encrypted.keys.map((k) => ({
                                 rid: k.rid,
                                 preKey: k.prekey,
-                                value: new Uint8Array(k.value),
+                                value: toWire(k.value),
                             })),
                         },
-                        payload: new Uint8Array(encrypted.payload),
+                        payload: toWire(encrypted.payload),
                     },
                     encryptionMethod: { id: NS_OMEMO_AXOLOTL, name: 'OMEMO' },
                     processingHints: { store: true },
@@ -1479,6 +1483,8 @@ export const AuthProvider: ParentComponent = (props) => {
     });
 
     const value: AuthContextType = {
+        client,
+        hasSession,
         isAuthed,
         isConnecting,
         isBootstrapping,
@@ -1488,7 +1494,6 @@ export const AuthProvider: ParentComponent = (props) => {
         profile,
         contacts,
         presence: () => settings().presence,
-        login,
         logout,
         setResource,
         privateChats,
@@ -1562,8 +1567,12 @@ export const AuthProvider: ParentComponent = (props) => {
         });
     }
 
+    return value;
+};
+
+export const AuthProvider: ParentComponent<{ session: AuthContextType }> = (props) => {
     return (
-        <AuthContext.Provider value={value}>
+        <AuthContext.Provider value={props.session}>
             {props.children}
         </AuthContext.Provider>
     )

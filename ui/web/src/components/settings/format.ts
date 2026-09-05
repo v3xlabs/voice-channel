@@ -1,6 +1,9 @@
+// Conversations and Monal show the 32-byte Curve25519 key without its 0x05 type prefix.
+// Stripping it here lets a user compare fingerprints across apps.
 export const fingerprintDisplay = (fingerprint: string) => {
     if (!fingerprint) return 'Unknown';
-    return fingerprint.match(/.{1,8}/g)?.join(' ') || fingerprint;
+    const bare = fingerprint.length === 66 && fingerprint.startsWith('05') ? fingerprint.slice(2) : fingerprint;
+    return bare.match(/.{1,8}/g)?.join(' ') || bare;
 };
 
 export const formatTimestamp = (timestamp?: number) => {

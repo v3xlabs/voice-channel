@@ -1,32 +1,36 @@
 import { useLocation, useParams, useSearchParams } from "@solidjs/router";
-import { BsHash, BsArrowRepeat } from "solid-icons/bs";
+import { BsHash, BsArrowRepeat, BsVolumeUp } from "solid-icons/bs";
 import { Show, For } from "solid-js";
 import { ContextMenu } from "@kobalte/core/context-menu";
 import { IdIcon } from "../icon";
 import { useAuth } from "../auth/provider";
 import { Jid } from "../components/jid";
 import { Avatar } from "../components/avatar";
+import { useGuilds } from "../guilds/provider";
+import type { GuildChannel } from "../xmpp/guild";
 
-type Channel = {
-    channel_id: string;
-    group_id: string;
-    name: string;
+/** Who is in a voice channel's call, shown under the channel like a Discord voice channel. */
+const CallMembers = (props: { roomJid: string }) => {
+    const { room } = useGuilds();
+    const members = () => Object.values(room(props.roomJid)?.occupants ?? {}).filter((occupant) => occupant.call);
+    return (
+        <Show when={members().length > 0}>
+            <ul class="pl-10 pb-1 space-y-0.5">
+                <For each={members()}>
+                    {(occupant) => (
+                        <li class="flex items-center gap-2 text-xs text-neutral-400">
+                            <Avatar jid={occupant.jid} name={occupant.nick} size={16} />
+                            <span class="truncate">{occupant.nick}</span>
+                            <Show when={occupant.call?.voice.muted}><span class="text-neutral-600">muted</span></Show>
+                        </li>
+                    )}
+                </For>
+            </ul>
+        </Show>
+    );
 };
 
-const CHANNELS: Channel[] = [
-    { channel_id: 'chat', group_id: '1', name: 'chat' },
-    { channel_id: 'general', group_id: '1', name: 'general' },
-    { channel_id: 'support', group_id: '1', name: 'support' },
-    { channel_id: 'voice', group_id: '2', name: 'voice' },
-    { channel_id: 'clips', group_id: '2', name: 'clips' },
-    { channel_id: 'random', group_id: '3', name: 'random' },
-    { channel_id: 'qa', group_id: '3', name: 'qa' },
-    { channel_id: 'chat', group_id: '4', name: 'chat' },
-    { channel_id: 'voice', group_id: '5', name: 'voice' },
-    { channel_id: 'main', group_id: '6', name: 'main' },
-];
-
-const ChannelItem = (props: { channel: Channel, active: boolean }) => {
+const ChannelItem = (props: { slug: string, channel: GuildChannel, active: boolean }) => {
     return (
         <ContextMenu>
             <ContextMenu.Trigger>
@@ -39,14 +43,16 @@ const ChannelItem = (props: { channel: Channel, active: boolean }) => {
                     }}
                 >
                     <a
-                        href={`/server/${props.channel.group_id}/${props.channel.channel_id}`}
+                        href={`/server/${props.slug}/${props.channel.name}`}
                         classList={{
                             "w-full h-full flex items-center gap-0.5": true,
                             "text-neutral-400 hover:text-white": !props.active,
                             "text-white": props.active,
                         }}
                     >
-                        <BsHash class="text-xl" />
+                        <Show when={props.channel.kind === 'voice'} fallback={<BsHash class="text-xl" />}>
+                            <BsVolumeUp class="text-xl" />
+                        </Show>
                         {props.channel.name}
                     </a>
                 </li>
@@ -124,14 +130,15 @@ export const ServerChannels = () => {
     const params = useParams<{ groupId: string, channelId: string }>();
     const [search] = useSearchParams<{ chat?: string }>();
     const { privateChats, isSyncing } = useAuth();
+    const { guild } = useGuilds();
     const isMessagesRoute = () => location.pathname.startsWith('/messages');
     const activeChat = () => search.chat || privateChats()[0]?.jid || '';
-    const channels = () => CHANNELS.filter((channel) => channel.group_id === params.groupId);
+    const categories = () => guild(params.groupId)?.categories ?? [];
 
     return (
         <Show when={isMessagesRoute() || params.groupId}>
             <div class="w-full">
-                <Show when={isMessagesRoute()} fallback={<h1 class="p-4">Server Channels</h1>}>
+                <Show when={isMessagesRoute()} fallback={<h1 class="p-4 truncate">{guild(params.groupId)?.name ?? params.groupId}</h1>}>
                     <div class="flex items-center justify-between p-4">
                         <h1>Messages</h1>
                         <Show when={isSyncing()}>
@@ -141,14 +148,26 @@ export const ServerChannels = () => {
                 </Show>
 
                 <Show when={!isMessagesRoute()}>
-                    <Show when={channels().length > 0} fallback={<p class="px-4 text-neutral-400 text-sm">No channels in this group yet.</p>}>
-                        <ul>
-                            <For each={channels()}>
-                                {(channel) =>
-                                    <ChannelItem channel={channel} active={channel.channel_id === params.channelId} />
-                                }
-                            </For>
-                        </ul>
+                    <Show when={categories().length > 0} fallback={<p class="px-4 text-neutral-400 text-sm">No channels in this guild yet.</p>}>
+                        <For each={categories()}>
+                            {(category) => (
+                                <div class="pb-2">
+                                    <p class="px-4 pt-2 pb-1 text-[11px] uppercase tracking-wide text-neutral-500">{category.name}</p>
+                                    <ul>
+                                        <For each={category.channels}>
+                                            {(channel) =>
+                                                <>
+                                                    <ChannelItem slug={params.groupId} channel={channel} active={channel.name === params.channelId} />
+                                                    <Show when={channel.kind === 'voice'}>
+                                                        <CallMembers roomJid={channel.jid} />
+                                                    </Show>
+                                                </>
+                                            }
+                                        </For>
+                                    </ul>
+                                </div>
+                            )}
+                        </For>
                     </Show>
                 </Show>
 

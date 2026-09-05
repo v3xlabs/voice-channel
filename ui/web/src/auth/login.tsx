@@ -1,5 +1,5 @@
 import type { Component } from "solid-js";
-import { useAuth } from "./provider";
+import { useAccounts } from "./accounts";
 import { createSignal, Match, Switch } from "solid-js";
 
 export const Login: Component = () => {
@@ -50,13 +50,17 @@ export const Login: Component = () => {
     );
 };
 
-const XMPPLoginForm: Component = () => {
-    const { login } = useAuth();
+export const XMPPLoginForm: Component<{ onDone?: () => void }> = (props) => {
+    const { addAccount, setActive } = useAccounts();
     const [jid, setJid] = createSignal<string>('');
     const [password, setPassword] = createSignal<string>('');
 
+    // Activating an account remounts the router, so the navigation must land first.
     const handleLogin = () => {
-        login(jid(), password());
+        const key = addAccount(jid(), password());
+        if (!key) return;
+        props.onDone?.();
+        setTimeout(() => setActive(key), 0);
     };
 
     return (

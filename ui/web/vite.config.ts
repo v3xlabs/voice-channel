@@ -8,7 +8,7 @@ export default defineConfig(async () => ({
   plugins: [solidDevtools(), solid(), tailwindcss()],
   clearScreen: false,
   server: {
-    host: "127.0.0.1",
+    host: "localhost",
     port: 5173,
     strictPort: true,
   },

@@ -26,26 +26,27 @@ import {
     OmemoDeviceList,
     StoredOmemoIdentity,
 } from './types';
+import { Buffer } from 'stanza/platform';
 import {
     acquireAccountLock,
     arrayBufferToHex,
     base64ToBuffer,
-    browserDevicesStoreKey,
     bufferToBase64,
-    getBrowserRegisteredDevices,
     readAccountStore,
     readTabStore,
-    registerBrowserDevice,
     releaseAccountLock,
     removeAccountStore,
     removeTabStore,
     toBareJid,
-    unregisterBrowserDevice,
     writeAccountStore,
-    writeTabStore,
 } from './storage';
 
-const IDENTITY_TAB_KEY = 'omemo-identity';
+/** stanza serializes binary fields only from its own Buffer type. Anything else becomes text. */
+export const toWire = (value: ArrayBuffer | Uint8Array): Buffer => Buffer.from(new Uint8Array(value));
+
+const IDENTITY_KEY = 'omemo-identity';
+const LEGACY_IDENTITY_TAB_KEY = 'omemo-identity';
+const OMEMO_PREKEY_POOL = 100;
 const CONTACT_DEVICES_KEY = 'omemo-contact-devices';
 const CONTACT_BUNDLES_KEY = 'omemo-contact-bundles';
 const SESSIONS_KEY = 'omemo-sessions';
@@ -58,6 +59,11 @@ const OMEMO_DEVICELIST_ITEM_ID = 'current';
 const OMEMO_BUNDLE_ITEM_ID = 'current';
 const IDENTITY_INIT_LOCK = 'omemo-identity-init-lock';
 const PUBLISH_LOCK = 'omemo-publish-lock';
+
+const isItemNotFound = (error: unknown): boolean => {
+    const err = error as { error?: { condition?: string } };
+    return err?.error?.condition === 'item-not-found';
+};
 
 export type OmemoKeyEntry = {
     rid: number;
@@ -86,6 +92,20 @@ const importKeyPair = (kp: { pubKey: string; privKey: string }): KeyPairType => 
     pubKey: base64ToBuffer(kp.pubKey),
     privKey: base64ToBuffer(kp.privKey),
 });
+
+const yieldToEventLoop = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+// Curve25519 keypairs come from pure JavaScript and take milliseconds each. Yielding
+// between them keeps the page painting while a fresh identity is built.
+const generatePreKeys = async (firstId: number, count: number): Promise<StoredOmemoIdentity['preKeys']> => {
+    const preKeys: StoredOmemoIdentity['preKeys'] = [];
+    for (let id = firstId; id < firstId + count; id++) {
+        const pk = await KeyHelper.generatePreKey(id);
+        preKeys.push({ id: pk.keyId, keyPair: exportKeyPair(pk.keyPair) });
+        if ((id - firstId) % 5 === 4) await yieldToEventLoop();
+    }
+    return preKeys;
+};
 
 const OMEMO_AES_KEY_BYTES = 16;
 const OMEMO_GCM_TAG_BITS = 128;
@@ -198,8 +218,6 @@ export class OmemoManager {
     private pepAccessEnsured = new Set<string>();
     private shouldEncryptToDevice: ((contactJid: string, deviceId: number) => boolean) | undefined;
 
-    private storageListener: ((event: StorageEvent) => void) | undefined;
-
     constructor(accountJid: string) {
         this.accountJid = toBareJid(accountJid);
         this.sessions = readAccountStore<Record<string, SessionRecordType>>(this.accountJid, SESSIONS_KEY, {});
@@ -225,17 +243,6 @@ export class OmemoManager {
 
     bindClient(client: Agent | undefined) {
         this.client = client;
-
-        if (typeof window === 'undefined' || this.storageListener) return;
-
-        const browserDevicesKey = browserDevicesStoreKey(this.accountJid);
-        this.storageListener = (event: StorageEvent) => {
-            if (event.key !== browserDevicesKey || !event.newValue) return;
-            void this.ensurePublished().catch((error) => {
-                console.warn('Failed to republish after browser device registry change', error);
-            });
-        };
-        window.addEventListener('storage', this.storageListener);
     }
 
     setEncryptFilter(filter: ((contactJid: string, deviceId: number) => boolean) | undefined) {
@@ -251,46 +258,35 @@ export class OmemoManager {
     // Identity
     // -----------------------------------------------------------------------
 
-    async initialize() {
-        const stored = readTabStore<StoredOmemoIdentity | undefined>(
-            this.accountJid,
-            IDENTITY_TAB_KEY,
-            undefined
-        );
+    /**
+     * One identity per account per browser profile, shared by every tab. Earlier builds kept
+     * one per tab in sessionStorage; such an identity is adopted once and then lives here.
+     */
+    private readStoredIdentity(): StoredOmemoIdentity | undefined {
+        const stored = readAccountStore<StoredOmemoIdentity | undefined>(this.accountJid, IDENTITY_KEY, undefined);
+        if (stored) return stored;
 
+        const legacy = readTabStore<StoredOmemoIdentity | undefined>(this.accountJid, LEGACY_IDENTITY_TAB_KEY, undefined);
+        if (!legacy) return undefined;
+        writeAccountStore(this.accountJid, IDENTITY_KEY, legacy);
+        removeTabStore(this.accountJid, LEGACY_IDENTITY_TAB_KEY);
+        return legacy;
+    }
+
+    async initialize() {
+        const stored = this.readStoredIdentity();
         if (stored) {
             this.identity = stored;
-            registerBrowserDevice(this.accountJid, stored.deviceId);
             this.purgeCorruptedBundleCache();
             this.persistLocalBundle();
             return;
         }
 
-        const acquired = await acquireAccountLock(this.accountJid, IDENTITY_INIT_LOCK, 15_000);
-        if (!acquired) {
-            await new Promise((resolve) => setTimeout(resolve, 250));
-            const retry = readTabStore<StoredOmemoIdentity | undefined>(
-                this.accountJid,
-                IDENTITY_TAB_KEY,
-                undefined
-            );
-            if (retry) {
-                this.identity = retry;
-                registerBrowserDevice(this.accountJid, retry.deviceId);
-                this.persistLocalBundle();
-                return;
-            }
-        }
-
+        await acquireAccountLock(this.accountJid, IDENTITY_INIT_LOCK, 15_000);
         try {
-            const existing = readTabStore<StoredOmemoIdentity | undefined>(
-                this.accountJid,
-                IDENTITY_TAB_KEY,
-                undefined
-            );
+            const existing = this.readStoredIdentity();
             if (existing) {
                 this.identity = existing;
-                registerBrowserDevice(this.accountJid, existing.deviceId);
                 this.persistLocalBundle();
                 return;
             }
@@ -301,13 +297,6 @@ export class OmemoManager {
             const signedPreKeyId = 1;
             const signedPreKey = await KeyHelper.generateSignedPreKey(identityKeyPair, signedPreKeyId);
 
-            const preKeyCount = 100;
-            const preKeys: Array<{ id: number; keyPair: { pubKey: string; privKey: string } }> = [];
-            for (let i = 0; i < preKeyCount; i++) {
-                const pk = await KeyHelper.generatePreKey(i + 1);
-                preKeys.push({ id: pk.keyId, keyPair: exportKeyPair(pk.keyPair) });
-            }
-
             this.identity = {
                 deviceId,
                 registrationId,
@@ -317,18 +306,26 @@ export class OmemoManager {
                     keyPair: exportKeyPair(signedPreKey.keyPair),
                     signature: bufferToBase64(signedPreKey.signature),
                 },
-                preKeys,
+                preKeys: await generatePreKeys(1, OMEMO_PREKEY_POOL),
                 createdAt: Date.now(),
             };
 
             this.persistIdentity();
-            registerBrowserDevice(this.accountJid, deviceId);
-            removeAccountStore(this.accountJid, 'omemo-identity');
             this.purgeCorruptedBundleCache();
             this.persistLocalBundle();
         } finally {
             releaseAccountLock(this.accountJid, IDENTITY_INIT_LOCK);
         }
+    }
+
+    /** Keep the pool full so the published bundle never runs out of one-time prekeys. */
+    private async replenishPreKeys() {
+        if (!this.identity || this.identity.preKeys.length >= OMEMO_PUBLISHED_PREKEY_COUNT) return;
+        const nextId = this.identity.preKeys.reduce((max, pk) => Math.max(max, pk.id), 0) + 1;
+        const fresh = await generatePreKeys(nextId, OMEMO_PREKEY_POOL - this.identity.preKeys.length);
+        this.identity.preKeys.push(...fresh);
+        this.persistIdentity();
+        await this.publishBundle();
     }
 
     private purgeCorruptedBundleCache() {
@@ -353,7 +350,7 @@ export class OmemoManager {
 
     private persistIdentity() {
         if (!this.identity) return;
-        writeTabStore(this.accountJid, IDENTITY_TAB_KEY, this.identity);
+        writeAccountStore(this.accountJid, IDENTITY_KEY, this.identity);
     }
 
     private persistSessions() {
@@ -462,15 +459,15 @@ export class OmemoManager {
             deviceId: this.identity.deviceId,
             bundle: {
                 itemType: NS_OMEMO_AXOLOTL_BUNDLES,
-                identityKey: base64ToBuffer(this.identity.identityKeyPair.pubKey),
+                identityKey: toWire(base64ToBuffer(this.identity.identityKeyPair.pubKey)),
                 signedPreKeyPublic: {
                     id: this.identity.signedPreKey.id,
-                    value: base64ToBuffer(this.identity.signedPreKey.keyPair.pubKey),
+                    value: toWire(base64ToBuffer(this.identity.signedPreKey.keyPair.pubKey)),
                 },
-                signedPreKeySignature: base64ToBuffer(this.identity.signedPreKey.signature),
+                signedPreKeySignature: toWire(base64ToBuffer(this.identity.signedPreKey.signature)),
                 preKeys: this.identity.preKeys.slice(0, OMEMO_PUBLISHED_PREKEY_COUNT).map((pk) => ({
                     id: pk.id,
-                    value: base64ToBuffer(pk.keyPair.pubKey),
+                    value: toWire(base64ToBuffer(pk.keyPair.pubKey)),
                 })),
             },
         };
@@ -608,6 +605,10 @@ export class OmemoManager {
             this.persistDeviceList(this.accountJid, { devices, fetchedAt: Date.now() });
             return devices;
         } catch (error) {
+            if (isItemNotFound(error)) {
+                this.persistDeviceList(this.accountJid, { devices: [], fetchedAt: Date.now() });
+                return [];
+            }
             console.warn('refreshOwnDeviceList failed', error);
             if (throwOnError) throw error;
             return this.getCachedDeviceList(this.accountJid)?.devices || [];
@@ -617,21 +618,15 @@ export class OmemoManager {
     private mergeDeviceList(existing: number[], extra: number[] = []): number[] {
         const merged = new Set<number>(existing);
         if (this.identity) merged.add(this.identity.deviceId);
-        for (const deviceId of getBrowserRegisteredDevices(this.accountJid)) {
-            merged.add(deviceId);
-        }
         for (const deviceId of extra) merged.add(deviceId);
         return Array.from(merged).sort((a, b) => a - b);
     }
 
-    /** Drop stale device IDs that have no published bundle (except local browser tabs). */
+    /** Drop device IDs whose published bundle is missing or unreadable. Ours is always kept. */
     private async filterDevicesForPublish(candidates: number[]): Promise<number[]> {
-        const localDevices = new Set<number>(getBrowserRegisteredDevices(this.accountJid));
-        if (this.identity) localDevices.add(this.identity.deviceId);
-
         const kept: number[] = [];
         for (const deviceId of candidates) {
-            if (localDevices.has(deviceId)) {
+            if (deviceId === this.identity?.deviceId) {
                 kept.push(deviceId);
                 continue;
             }
@@ -1031,6 +1026,7 @@ export class OmemoManager {
                 if (!self.identity) return;
                 self.identity.preKeys = self.identity.preKeys.filter((k) => k.id !== id);
                 self.persistIdentity();
+                void self.replenishPreKeys().catch((error) => console.warn('prekey replenish failed', error));
             },
             loadSession: async (encodedAddress: string) => self.sessions[encodedAddress],
             storeSession: async (encodedAddress: string, record: SessionRecordType) => {
@@ -1048,9 +1044,8 @@ export class OmemoManager {
     }
 
     clear() {
-        removeTabStore(this.accountJid, IDENTITY_TAB_KEY);
-        removeAccountStore(this.accountJid, 'omemo-identity');
-        unregisterBrowserDevice(this.accountJid);
+        removeTabStore(this.accountJid, LEGACY_IDENTITY_TAB_KEY);
+        removeAccountStore(this.accountJid, IDENTITY_KEY);
         removeAccountStore(this.accountJid, CONTACT_DEVICES_KEY);
         removeAccountStore(this.accountJid, CONTACT_BUNDLES_KEY);
         removeAccountStore(this.accountJid, SESSIONS_KEY);

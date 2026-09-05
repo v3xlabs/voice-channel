@@ -1,0 +1,10 @@
+{
+  "description": "voice.channel rooms: one subgroup per voice channel, created on first join by vcd",
+  "public": false,
+  "auto-subgroups": true,
+  "allow-recording": false,
+  "users": {
+    "vcd": { "password": "vc-dev-galene-secret", "permissions": "op" }
+  },
+  "wildcard-user": { "password": { "type": "wildcard" }, "permissions": "present" }
+}

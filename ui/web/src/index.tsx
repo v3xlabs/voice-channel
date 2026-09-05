@@ -4,7 +4,7 @@ import { render } from 'solid-js/web';
 import 'solid-devtools';
 
 import { App } from './App';
-import { AuthProvider } from './auth/provider';
+import { AccountsProvider } from './auth/accounts';
 import { Router } from '@solidjs/router';
 
 const root = document.getElementById('root');
@@ -15,4 +15,6 @@ if (import.meta.env.DEV && !(root instanceof HTMLElement)) {
   );
 }
 
-render(() => <AuthProvider children={<Router><App /></Router>} />, root!);
+// The router renders matched routes under its own root, so every context a route
+// component reads must wrap the router, not sit beside the route definitions.
+render(() => <AccountsProvider><Router><App /></Router></AccountsProvider>, root!);

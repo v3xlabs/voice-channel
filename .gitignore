@@ -3,3 +3,6 @@ node_modules/
 .idea/
 stanza/
 dist/
+.envrc
+.direnv/
+.tmp/

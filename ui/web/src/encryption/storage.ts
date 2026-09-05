@@ -83,54 +83,13 @@ export const removeAccountStore = (accountJid: string, key: string) => {
     localStorage.removeItem(accountKey(accountJid, key));
 };
 
-const BROWSER_DEVICES_KEY = 'omemo-browser-devices';
-
 export const readTabStore = <T,>(accountJid: string, key: string, fallback: T): T => {
     return parseJSON<T>(sessionStorage.getItem(accountKey(accountJid, key, getTabId())), fallback);
-};
-
-export const writeTabStore = <T,>(accountJid: string, key: string, value: T) => {
-    sessionStorage.setItem(accountKey(accountJid, key, getTabId()), JSON.stringify(value));
 };
 
 export const removeTabStore = (accountJid: string, key: string) => {
     sessionStorage.removeItem(accountKey(accountJid, key, getTabId()));
 };
-
-export const registerBrowserDevice = (accountJid: string, deviceId: number) => {
-    const storeKey = accountKey(accountJid, BROWSER_DEVICES_KEY);
-    const tabId = getTabId();
-    const all = parseJSON<Record<string, { deviceId: number; updatedAt: number }>>(
-        localStorage.getItem(storeKey),
-        {}
-    );
-    all[tabId] = { deviceId, updatedAt: Date.now() };
-    localStorage.setItem(storeKey, JSON.stringify(all));
-};
-
-export const unregisterBrowserDevice = (accountJid: string) => {
-    const storeKey = accountKey(accountJid, BROWSER_DEVICES_KEY);
-    const tabId = getTabId();
-    const all = parseJSON<Record<string, { deviceId: number; updatedAt: number }>>(
-        localStorage.getItem(storeKey),
-        {}
-    );
-    if (!(tabId in all)) return;
-    delete all[tabId];
-    localStorage.setItem(storeKey, JSON.stringify(all));
-};
-
-export const getBrowserRegisteredDevices = (accountJid: string): number[] => {
-    const storeKey = accountKey(accountJid, BROWSER_DEVICES_KEY);
-    const all = parseJSON<Record<string, { deviceId: number }>>(
-        localStorage.getItem(storeKey),
-        {}
-    );
-    return Array.from(new Set(Object.values(all).map((entry) => entry.deviceId)));
-};
-
-export const browserDevicesStoreKey = (accountJid: string) =>
-    accountKey(accountJid, BROWSER_DEVICES_KEY);
 
 export const bufferToBase64 = (buffer: ArrayBuffer | Uint8Array): string => {
     const bytes = new Uint8Array(buffer);

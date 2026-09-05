@@ -28,8 +28,22 @@ const SCREEN_SID_PREFIX: &str = "screen-";
 /// Every participant of every conference this daemon serves, keyed by full JID.
 #[derive(Default)]
 pub struct Conferences {
-    participants: Mutex<HashMap<String, Arc<Participant>>>,
+    registry: Mutex<Registry>,
 }
+
+/// Held under one lock so that a candidate cannot be dropped between the lookup that misses
+/// and the insert that would have served it.
+#[derive(Default)]
+struct Registry {
+    participants: HashMap<String, Arc<Participant>>,
+    /// Candidates from a client that trickled before its `session-initiate` finished opening
+    /// the participant's Galene connection, by full JID and Galene stream id.
+    early: HashMap<String, Vec<(String, Value)>>,
+}
+
+/// A client trickles a handful of candidates per stream. Anything past this is not a client
+/// waiting on its own `session-initiate`.
+const MAX_EARLY_CANDIDATES: usize = 32;
 
 struct Participant {
     jid: String,
@@ -128,7 +142,7 @@ pub async fn handle_jingle(
                     "join the room's call first",
                 ));
             }
-            let participant =
+            let (participant, early) =
                 ensure_participant(session, conferences, &from, &conference, &room).await?;
             let sdp = sdp_jingle::jingle_to_sdp(jingle, Role::Initiator)?;
             let label = if sid.starts_with(SCREEN_SID_PREFIX) {
@@ -142,6 +156,11 @@ pub async fn handle_jingle(
                 .expect("ups lock")
                 .insert(sid.clone(), ());
             participant.galene.offer(&sid, label, &sdp).await?;
+            // Galene drops a candidate for a stream it has not been offered yet, so these only
+            // go out now that the offer is through.
+            for (stream, candidate) in early {
+                participant.galene.ice(&stream, candidate).await?;
+            }
             info!(participant = %from, room, label, "publishing stream");
             Ok(ok(iq))
         }
@@ -152,13 +171,16 @@ pub async fn handle_jingle(
             Ok(ok(iq))
         }
         "transport-info" => {
-            let participant = conferences.get(&from).ok_or_else(unknown)?;
+            let stream = stream_id_of(&sid);
             for content in jingle.children().filter(|c| c.is("content", NS_JINGLE)) {
-                if let Some(candidate) = sdp_jingle::jingle_candidate_to_ice(content) {
-                    participant
-                        .galene
-                        .ice(stream_id_of(&sid), candidate)
-                        .await?;
+                let Some(candidate) = sdp_jingle::jingle_candidate_to_ice(content) else {
+                    continue;
+                };
+                // A client trickles its first candidate within a millisecond of the
+                // session-initiate, well before that initiate has opened its Galene connection.
+                if let Some((participant, candidate)) = conferences.route(&from, stream, candidate)
+                {
+                    participant.galene.ice(stream, candidate).await?;
                 }
             }
             Ok(ok(iq))
@@ -196,28 +218,57 @@ pub async fn handle_jingle(
 
 impl Conferences {
     fn get(&self, jid: &str) -> Option<Arc<Participant>> {
-        self.participants
+        self.registry
             .lock()
-            .expect("participants lock")
+            .expect("registry lock")
+            .participants
             .get(jid)
             .cloned()
     }
 
     fn remove(&self, jid: &str) -> Option<Arc<Participant>> {
-        self.participants
-            .lock()
-            .expect("participants lock")
-            .remove(jid)
+        let mut registry = self.registry.lock().expect("registry lock");
+        registry.early.remove(jid);
+        registry.participants.remove(jid)
     }
 
     fn matching(&self, room: &str, full: &str) -> Vec<Arc<Participant>> {
-        self.participants
+        self.registry
             .lock()
-            .expect("participants lock")
+            .expect("registry lock")
+            .participants
             .values()
             .filter(|p| p.room == room && p.jid == full)
             .cloned()
             .collect()
+    }
+
+    /// The participant to send this candidate to, or `None` once it is held for the
+    /// `session-initiate` that is still opening their Galene connection.
+    fn route(
+        &self,
+        jid: &str,
+        stream: &str,
+        candidate: Value,
+    ) -> Option<(Arc<Participant>, Value)> {
+        let mut registry = self.registry.lock().expect("registry lock");
+        if let Some(participant) = registry.participants.get(jid) {
+            return Some((participant.clone(), candidate));
+        }
+        let early = registry.early.entry(jid.to_string()).or_default();
+        if early.len() < MAX_EARLY_CANDIDATES {
+            early.push((stream.to_string(), candidate));
+        }
+        None
+    }
+
+    /// Register a participant and take the candidates that arrived while it was opening.
+    fn insert(&self, participant: &Arc<Participant>) -> Vec<(String, Value)> {
+        let mut registry = self.registry.lock().expect("registry lock");
+        registry
+            .participants
+            .insert(participant.jid.clone(), participant.clone());
+        registry.early.remove(&participant.jid).unwrap_or_default()
     }
 }
 
@@ -227,9 +278,9 @@ async fn ensure_participant(
     jid: &str,
     conference: &str,
     room: &str,
-) -> Result<Arc<Participant>> {
+) -> Result<(Arc<Participant>, Vec<(String, Value)>)> {
     if let Some(existing) = conferences.get(jid) {
-        return Ok(existing);
+        return Ok((existing, Vec::new()));
     }
     let node = conference.split('@').next().unwrap_or(conference);
     let group = format!("vc/{node}");
@@ -251,14 +302,10 @@ async fn ensure_participant(
         ups: Mutex::new(HashMap::new()),
         downs: Mutex::new(HashMap::new()),
     });
-    conferences
-        .participants
-        .lock()
-        .expect("participants lock")
-        .insert(jid.to_string(), participant.clone());
+    let early = conferences.insert(&participant);
     tokio::spawn(pump_events(session.clone(), participant.clone(), events_rx));
     info!(participant = jid, group, "joined galene");
-    Ok(participant)
+    Ok((participant, early))
 }
 
 /// Galene events for one participant become Jingle towards that participant.

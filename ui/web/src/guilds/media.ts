@@ -10,6 +10,38 @@ const SPEAKING_LEVEL = 0.02;
 /** Screen share sessions carry this sid prefix so the conference service labels them apart. */
 const SCREEN_SID_PREFIX = 'screen-';
 
+/**
+ * The instance's STUN and TURN services (XEP-0215) as ICE servers.
+ *
+ * stanza's own `discoverICEServers` cannot be used: it resolves to an empty array and only
+ * populates `jingle.iceServers` as a side effect, and it appends `?transport=` to every URI,
+ * which RFC 7064 does not allow on a `stun:` one. RTCPeerConnection then refuses to construct.
+ */
+const discoverIceServers = async (client: Agent): Promise<RTCIceServer[]> => {
+    const domain = client.config.server;
+    if (!domain) return [];
+    const response = await client.getServices(domain, undefined, '2').catch(() => undefined);
+    return (response?.services ?? []).flatMap((service): RTCIceServer[] => {
+        if (!service.host) return [];
+        const host = service.host.includes(':') ? `[${service.host}]` : service.host;
+        const uri = `${service.type}:${host}${service.port ? `:${service.port}` : ''}`;
+        switch (service.type) {
+            case 'stun':
+            case 'stuns':
+                return [{ urls: uri }];
+            case 'turn':
+            case 'turns':
+                return [{
+                    urls: service.transport ? `${uri}?transport=${service.transport}` : uri,
+                    username: service.username,
+                    credential: service.password,
+                }];
+            default:
+                return [];
+        }
+    });
+};
+
 export type DeviceChoice = {
     mic?: string;
     camera?: string;
@@ -155,10 +187,7 @@ export const createMediaController = (client: () => Agent | undefined) => {
         const c = client();
         if (!c) return;
         conference = conferenceJid;
-        // discoverICEServers appends what XEP-0215 returned to jingle.iceServers and resolves
-        // to an empty array, so its result must not be assigned back over them.
-        c.jingle.iceServers = [];
-        await c.discoverICEServers();
+        c.jingle.iceServers = await discoverIceServers(c);
         micStream = await openMic();
         for (const track of micStream.getAudioTracks()) track.enabled = !muted;
         watchLevel('local', micStream);

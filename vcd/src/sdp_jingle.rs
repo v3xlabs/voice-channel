@@ -150,15 +150,18 @@ pub fn jingle_to_sdp(jingle: &Element, writer: Role) -> Result<String> {
                     fb.attr("type").unwrap_or("")
                 );
             }
+            // A parameter carries either a `name=value` pair or a bare token, and a browser puts
+            // that bare token in `name`: RED offers `<parameter name="111/111"/>`.
             let params: Vec<String> = payload
                 .children()
                 .filter(|c| c.is("parameter", NS_RTP))
-                .map(|p| match p.attr("name") {
-                    Some(name) if !name.is_empty() => {
-                        format!("{name}={}", p.attr("value").unwrap_or(""))
-                    }
-                    _ => p.attr("value").unwrap_or("").to_string(),
-                })
+                .filter_map(
+                    |p| match (p.attr("name").filter(|n| !n.is_empty()), p.attr("value")) {
+                        (Some(name), Some(value)) => Some(format!("{name}={value}")),
+                        (Some(token), None) | (None, Some(token)) => Some(token.to_string()),
+                        (None, None) => None,
+                    },
+                )
                 .collect();
             if !params.is_empty() {
                 let _ = writeln!(sdp, "a=fmtp:{id} {}\r", params.join(";"));

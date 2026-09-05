@@ -1,6 +1,6 @@
 import { createContext, createEffect, createSignal, onCleanup, useContext, type Accessor, type ParentComponent } from 'solid-js';
 import { createStore, produce } from 'solid-js/store';
-import { JID, type Agent } from 'stanza';
+import { Constants, JID, type Agent } from 'stanza';
 import type { MediaSession } from 'stanza/jingle';
 import { createMediaController, type MediaController } from './media';
 import type { ReceivedMessage, ReceivedMUCPresence, MAMFin, DiscoItemsResult } from 'stanza/protocol';
@@ -319,7 +319,11 @@ export const GuildProvider: ParentComponent = (props) => {
                     call: Object.values(devices).find((state) => state !== undefined),
                 };
             }));
-            if (nick === callNick() && presence.muc.jid === c.jid) onOwnEcho(roomJid, presence);
+            // Several devices of one account share the call nick, and the room then lists every
+            // one of them in the echo. Status code 110 is the only per-recipient marker of which
+            // presence is ours.
+            const isOwnEcho = presence.muc.statusCodes?.includes(Constants.MUCStatusCode.SelfPresence);
+            if (nick === callNick() && isOwnEcho) onOwnEcho(roomJid, presence);
         };
 
         const onGroupchat = (msg: ReceivedMessage) => {

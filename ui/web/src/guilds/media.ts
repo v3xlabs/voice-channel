@@ -11,6 +11,20 @@ const SPEAKING_LEVEL = 0.02;
 const SCREEN_SID_PREFIX = 'screen-';
 
 /**
+ * A device id stored from an earlier session goes stale as soon as the hardware changes, and an
+ * `exact` constraint then rejects instead of picking another device. Falling back keeps a stale
+ * choice from stranding the call: without a published stream the conference service never opens
+ * the participant's connection, so they would not receive anyone else either.
+ */
+const openStream = async (
+    constraints: MediaStreamConstraints,
+    fallback: MediaStreamConstraints,
+): Promise<MediaStream> =>
+    navigator.mediaDevices
+        .getUserMedia(constraints)
+        .catch(() => navigator.mediaDevices.getUserMedia(fallback));
+
+/**
  * The instance's STUN and TURN services (XEP-0215) as ICE servers.
  *
  * stanza's own `discoverICEServers` cannot be used: it resolves to an empty array and only
@@ -175,9 +189,10 @@ export const createMediaController = (client: () => Agent | undefined) => {
     };
 
     const openMic = async () => {
-        const stream = await navigator.mediaDevices.getUserMedia({
-            audio: state.chosen.mic ? { deviceId: { exact: state.chosen.mic } } : true,
-        });
+        const stream = await openStream(
+            { audio: state.chosen.mic ? { deviceId: { exact: state.chosen.mic } } : true },
+            { audio: true },
+        );
         setState('micLabel', stream.getAudioTracks()[0]?.label);
         return stream;
     };
@@ -224,9 +239,10 @@ export const createMediaController = (client: () => Agent | undefined) => {
             return;
         }
         if (!c || !conference) return;
-        const stream = await navigator.mediaDevices.getUserMedia({
-            video: state.chosen.camera ? { deviceId: { exact: state.chosen.camera } } : true,
-        });
+        const stream = await openStream(
+            { video: state.chosen.camera ? { deviceId: { exact: state.chosen.camera } } : true },
+            { video: true },
+        );
         setState('cameraStream', stream);
         cameraSession = c.jingle.createMediaSession(conference, undefined, stream);
         await cameraSession.start();
